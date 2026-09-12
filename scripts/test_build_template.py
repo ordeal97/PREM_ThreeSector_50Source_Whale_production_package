@@ -37,12 +37,12 @@ class BuildTests(unittest.TestCase):
     def test_expected_specfem_makefile_derivations_do_not_block(self):
         _, old = self.fixture()
         (old / 'config.status').write_text(
-            'ac_cs_config=\'FC=gfortran CC=mpiicc MPIFC=mpif90 CXXFLAGS="-g -O2" --with-mpi --with-asdf\'\n'
-            'S["FC"]="gfortran"\nS["CC"]="mpiicc"\nS["MPIFC"]="mpif90"\n'
+            'ac_cs_config=\'FC=gfortran CC=icc MPIFC=mpif90 CXXFLAGS="-g -O2" --with-mpi --with-asdf\'\n'
+            'S["FC"]="gfortran"\nS["CC"]="icc"\nS["MPIFC"]="mpif90"\n'
             'S["CPPFLAGS"]=""\nS["CXXFLAGS"]="-g -O2"\nS["LDFLAGS"]=""\nS["MPICC"]="mpiicc"\n')
         (old / 'Makefile').write_text(
             'FC = gfortran\nCPPFLAGS = -I${SETUP}\nCXXFLAGS = -I${SETUP} -g -O2\n'
-            'LDFLAGS =\nMPILIBS += $(LDFLAGS)\nCC = mpiicc\nMPICC = $(CC)\nADIOS2 = no\n')
+            'LDFLAGS =\nMPILIBS += $(LDFLAGS)\nCC = icc\nMPICC = $(CC)\nADIOS2 = no\n')
         result = inspect_reference(old)
         self.assertEqual(result['makefile_differences'], [])
         self.assertEqual(len(result['expected_makefile_differences']), 3)

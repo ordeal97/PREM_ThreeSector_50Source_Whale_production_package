@@ -39,7 +39,7 @@ def _makefile_differences(makefile, substitutions):
         reason = None
         if key in {'CPPFLAGS', 'CXXFLAGS'} and actual == ('-I${SETUP}' + ((' ' + configured) if configured else '')):
             reason = 'SPECFEM Makefile.in prepends -I${SETUP}'
-        elif key == 'MPICC' and actual == '$(CC)' and assignments.get('ADIOS2') == 'no' and assignments.get('CC') == configured:
+        elif key == 'MPICC' and actual == '$(CC)' and assignments.get('ADIOS2') == 'no' and assignments.get('CC') == substitutions.get('CC'):
             reason = 'SPECFEM Makefile.in derives MPICC=$(CC) when ADIOS2=no'
         item = {'variable': key, 'configured': configured, 'makefile': actual}
         if reason:
