@@ -15,9 +15,10 @@ def control_lsf(cfg,action,retry=None):
  target=runtime(cfg)['root']/'rendered_lsf'/f'production_{action}.lsf';target.parent.mkdir(parents=True,exist_ok=True)
  retry_arg='' if not retry else ' --retry '+retry
  target.write_text(f'''#!/usr/bin/env bash
-#BSUB -J PREM3S_{action}
+#BSUB -J {cfg['lsf']['control_job_prefix']}_PREM3S_{action}
 #BSUB -q {cfg['lsf']['control_queue']}
 #BSUB -n {cfg['lsf']['control_ranks']}
+#BSUB -R "span[hosts={cfg['lsf']['control_hosts']}]"
 #BSUB -o {runtime(cfg)['root']}/logs/{action}-%J.out
 #BSUB -e {runtime(cfg)['root']}/logs/{action}-%J.err
 set -euo pipefail
@@ -36,7 +37,7 @@ def main():
  if a.cmd=='dry-run':
   _,errors=run_preflight(False);print(json.dumps({'status':'FAIL' if errors else 'PASS','runs':100,'max_active_runs':cfg['lsf']['max_active_runs'],'stage_barrier':'all 50 B0 DONE + QC PASS','bsub_called':False,'mesher_called':False,'solver_called':False},indent=2));raise SystemExit(bool(errors))
  if a.cmd=='deployment-check':
-  print(json.dumps({'deployment_time':True,'commands':{x:bool(shutil.which(x)) for x in ('bsub','bjobs','bhist','mpirun','make','git')},'build_manifest_present':any((runtime(cfg)['root']/'builds').glob('*/build_manifest.json')),'note':'does not invoke bsub/mesher/solver'},indent=2));return
+  subprocess.run([sys.executable,str(ROOT/'scripts/deployment_check.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='render':
   subprocess.run([sys.executable,str(ROOT/'scripts/render_lsf.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='materialize':

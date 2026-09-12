@@ -85,6 +85,9 @@ def run_preflight(write_outputs: bool = True) -> tuple[dict,list[str]]:
     if any(x["status"]!="PASS" or float(x["clearance_km"])<=0 for x in clearance): fail(errors,"overlap/contact audit failed")
     if cfg["lsf"]["max_active_runs"]!=2: fail(errors,"max_active_runs is not config value 2")
     if not cfg["staging"]["require_all_stage1_qc_pass"]: fail(errors,"stage barrier disabled")
+    if cfg.get("runtime",{}).get("python_bin")!="/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3": fail(errors,"runtime python differs from frozen Whale profile")
+    expected_environment={"oneapi_setup":"/share/apps/intel/oneapi_2023.1.0/setvars.sh","modules":["hdf5/1.14.3_oneapi2023"],"mpi_launcher":"mpirun"}
+    if cfg.get("environment")!=expected_environment: fail(errors,"environment differs from frozen A+ Whale profile")
     template=par(ROOT/"specfem_template/DATA/Par_file")
     scratch_seen=set(); run_ids=set(); stage_counts=Counter(); source_runs=Counter(); assigned=[]
     expected_common={"NCHUNKS":"6","NEX_XI":"448","NEX_ETA":"448","NPROC_XI":"8","NPROC_ETA":"8","MODEL":"1D_transversely_isotropic_prem","OCEANS":".false.","ELLIPTICITY":".true.","TOPOGRAPHY":".false.","GRAVITY":".true.","ROTATION":".true.","ATTENUATION":".true.","ABSORBING_CONDITIONS":".false.","OUTPUT_SEISMOS_ASDF":".true.","OUTPUT_SEISMOS_ASCII_TEXT":".false.","OUTPUT_SEISMOS_SAC_BINARY":".false."}

@@ -23,6 +23,11 @@ def load_config(path: Path):
  for key in ('mpi_ranks','ptile','max_active_runs','controller_poll_seconds','per_run_wait_seconds'):
   if int(cfg['lsf'][key])<1: raise ValueError('invalid lsf.'+key)
  if int(cfg['lsf']['mpi_ranks'])%int(cfg['lsf']['ptile']): raise ValueError('mpi_ranks must divide ptile')
+ for key in ('python_bin',):
+  if not cfg['runtime'].get(key): raise ValueError('missing runtime.'+key)
+ for key in ('oneapi_setup','mpi_launcher','modules'):
+  if key not in cfg['environment']: raise ValueError('missing environment.'+key)
+ if not isinstance(cfg['environment']['modules'],list) or not cfg['environment']['modules']: raise ValueError('environment.modules must be non-empty')
  for key in ('run_root','runtime_root','inputs_dir','manifest','status_template'):
   value=Path(cfg['paths'][key]);cfg['paths'][key]=value if value.is_absolute() else ROOT/value
  cfg['paths']['scratch_root']=Path(cfg['paths']['scratch_root'])

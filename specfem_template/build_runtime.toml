@@ -3,8 +3,10 @@ repository = "git@github.com:ordeal97/ulvz_specfem.git"
 commit = "72f0c39117df9395c12fa901a9ae99fa3e7bdfd9"
 
 [environment]
-modules = ["gcc/12.4.0", "openmpi/4.1.5"]
-mpi_launcher = "mpirun --map-by ppr:64:node --bind-to core --mca pml ucx --mca btl ^openib"
+python_bin = "/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3"
+oneapi_setup = "/share/apps/intel/oneapi_2023.1.0/setvars.sh"
+modules = ["hdf5/1.14.3_oneapi2023"]
+mpi_launcher = "mpirun"
 
 [build]
 mesher_target = "meshfem3D"

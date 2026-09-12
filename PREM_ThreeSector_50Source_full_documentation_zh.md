@@ -14,6 +14,8 @@ B0 明确为 `N_ULVZ=0`，没有 dummy body。TRIULVZ 明确为 `N_ULVZ=3`，bod
 
 multi-ULVZ 源码基准为 `git@github.com:ordeal97/ulvz_specfem.git` 的 `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9`。该 commit 的真实 mesher 验证属于上游证据；本包未重跑 mesher 或 solver。
 
+Whale 的运行 profile 继承 A+ package：control Python 为 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`，要求 Python ≥3.11 且可导入 `numpy`、`h5py`；LSF/build 通过 `/share/apps/intel/oneapi_2023.1.0/setvars.sh` 初始化 oneAPI，加载 `hdf5/1.14.3_oneapi2023`，MPI launcher 为 `mpirun`。这些设定在 `config/production.toml` 中冻结，并由 build-template 与 rendered LSF 共同使用。
+
 ## 输入冻结与 preflight
 
 `production_run_manifest.csv`、catalogs、100 份 `production_inputs/*/DATA`、`rendered_lsf/` 与母包共同定义冻结输入。`scripts/preflight.py` 从 rendered DATA 对照 source、station、parameter、instance 与 manifest；检查 50/510/100/150 计数、39/4/3/1/3 深度配额、0/3 bodies、zero taper、clearance、唯一 scratch、公共 Par_file、source pairing 与阶段身份。`preflight/all_runs_parameter_audit.csv` 是一行一个 run 的人工审查总表。

@@ -14,13 +14,21 @@ controller_poll_seconds = 300
 per_run_wait_seconds = 240
 control_queue = "serial"
 control_ranks = 1
+control_hosts = 1
+control_job_prefix = "production"
 [runtime]
-python_bin = "python3"
+python_bin = "/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3"
+[environment]
+oneapi_setup = "/share/apps/intel/oneapi_2023.1.0/setvars.sh"
+modules = ["hdf5/1.14.3_oneapi2023"]
+mpi_launcher = "mpirun"
 [build]
 mesher_target = "meshfem3D"
 solver_target = "specfem3D"
 make_jobs = 1
 [qc]
+enable_input_qc = true
+enable_output_qc = true
 cleanup_after_output_qc_pass = true
 [staging]
 stage1 = "stage1_baseline"

@@ -107,6 +107,13 @@ def run_build(root, reference, inspect_only=False, jobs=1):
     recipe = inspect_reference(reference)
     config = tomllib.loads((root / 'config/production.toml').read_text())
     recipe['source'] = config['source']
+    environment = config['environment']
+    recipe['canonical_environment'] = environment
+    expected_loads = {f'module load {item}' for item in environment['modules']}
+    reference_loads = {' '.join(item) for item in recipe['module_commands'] if len(item) >= 3 and item[1] == 'load'}
+    incompatible = sorted(reference_loads - expected_loads)
+    if incompatible:
+        recipe['errors'].append('Reference module load conflicts with frozen Whale environment: ' + ', '.join(incompatible))
     template = root / 'specfem_template'
     recipe['template_hashes'] = {str(p.relative_to(template)): sha(p) for p in sorted(template.rglob('*')) if p.is_file()}
     runtime = root / config['paths']['runtime_root'] / 'builds'
@@ -134,7 +141,9 @@ def run_build(root, reference, inspect_only=False, jobs=1):
         recipe['commands'].append(argv)
         save()
         if environment:
-            setup = '\n'.join(shlex.join(x) for x in recipe['module_commands'])
+            setup = '\n'.join(['module purge',
+                f'if [[ -z "${{I_MPI_ROOT:-}}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source "{recipe["canonical_environment"]["oneapi_setup"]}"; fi',
+                *[f'module load {item}' for item in recipe['canonical_environment']['modules']]])
             argv = ['bash', '-lc', 'set -e\n' + setup + '\nexec "$@"', 'build-template', *argv]
         with (output / 'build.log').open('a') as log:
             subprocess.run(argv, cwd=cwd, check=True, stdout=log, stderr=subprocess.STDOUT)

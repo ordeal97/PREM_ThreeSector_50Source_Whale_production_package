@@ -2,8 +2,9 @@
 # Per-run controller: compile mesher, submit/wait mesh, compile/submit solver.
 set -euo pipefail
 cd "${LS_SUBCWD:-$PWD}"; mkdir -p logs
-module load gcc/12.4.0
-module load openmpi/4.1.5
+module purge
+if [[ -z "${I_MPI_ROOT:-}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source "/share/apps/intel/oneapi_2023.1.0/setvars.sh"; fi
+module load hdf5/1.14.3_oneapi2023
 [[ -d "/scratch/yiy/ulvz/SRC019_TRIULVZ/DATABASES_MPI/" && -w "/scratch/yiy/ulvz/SRC019_TRIULVZ/DATABASES_MPI/" ]]
 lock=.mesh_solver_control.lock; mkdir "$lock" || { echo "active control lock" >&2; exit 2; }
 trap 'rmdir "$lock" 2>/dev/null || true' EXIT

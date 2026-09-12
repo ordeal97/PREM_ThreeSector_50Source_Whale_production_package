@@ -20,3 +20,5 @@ python scripts/production_cli.py build-template --reference-build /path/to/old/s
 每次在 `.production_runtime/builds/inherit-*` 新目录留下 `BUILD_INHERITANCE.md`、`build_manifest.json` 和构建日志；不覆盖旧构建，也不改变冻结输入。`--inspect-only` 通过只代表配置可解析，不代表依赖可用。真实编译和链接必须在 Whale 验证。solver 仍须在各 run 独立工作树中、mesher 产生新 header 后编译；报告中的 solver_recipe 仅记录此后步骤，不能提前共享 solver。
 
 `submit` 在 Whale 上通过一个静态 control LSF 作业启动唯一的生产 controller；它只在 preflight 未过期、已 materialize 且 `bsub` 可用时执行。`mock-submission` 是内存状态机测试：验证 100 个 run、并发上限 2 和 B0→TRIULVZ barrier，但不替代 Whale 的真实 LSF/mesher/solver 验证。
+
+Whale 依赖已冻结为 A+ 运行 profile：oneAPI 2023.1.0、`hdf5/1.14.3_oneapi2023`、`mpirun` 和 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`。运行 `deployment-check` 验证实际节点环境后，才允许 build/materialize/submit。

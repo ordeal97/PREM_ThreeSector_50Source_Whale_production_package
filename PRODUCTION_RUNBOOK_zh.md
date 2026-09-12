@@ -2,6 +2,8 @@
 
 本包已冻结科学设计与 100 份 DATA/LSF；未调用 bsub、mesher 或 solver。生产控制器只允许两个 active run，且必须先使 50 个 B0 全部 `DONE + output_qc=PASS`，才解锁 50 个 TRIULVZ。
 
+Whale 运行环境已继承 A+ package：控制 Python 为 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`；LSF 和构建先加载 `/share/apps/intel/oneapi_2023.1.0/setvars.sh`，再加载 `hdf5/1.14.3_oneapi2023`，以 `mpirun` 运行 MPI。Python 必须为 3.11 或更新版本，并可导入 `numpy`、`h5py`。`deployment-check` 会检查这些依赖，不运行 bsub、mesher 或 solver。
+
 在 Whale 的 package 根目录执行：
 
 ```bash

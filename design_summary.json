@@ -1,6 +1,6 @@
 {
   "deployment_time_validation": [
-    "Whale module/MPI and ASDF/HDF5 compatibility",
+    "Whale Python/numpy/h5py and oneAPI/HDF5/MPI availability",
     "pinned source build and executable link audit",
     "LSF queue, 384-rank host layout, memory and storage",
     "scratch and shared filesystem access",
@@ -38,7 +38,7 @@
   "n_ulvz_multi": 3,
   "nchunks": 6,
   "nstep": 25400,
-  "package_schema_version": "1.1",
+  "package_schema_version": "1.2",
   "parameter_source_counts": {
     "family_interpolant": 66,
     "legacy_parameter_anchor": 33,
@@ -67,5 +67,13 @@
   "specfem_source_repository": "git@github.com:ordeal97/ulvz_specfem.git",
   "stage_barrier": "all stage1_baseline runs must be DONE with output_qc PASS before stage2_multi is eligible",
   "validate_status": "PASS",
+  "whale_runtime": {
+    "modules": [
+      "hdf5/1.14.3_oneapi2023"
+    ],
+    "mpi_launcher": "mpirun",
+    "oneapi_setup": "/share/apps/intel/oneapi_2023.1.0/setvars.sh",
+    "python_bin": "/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3"
+  },
   "zero_taper": true
 }

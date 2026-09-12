@@ -16,10 +16,11 @@ def latest_build(cfg):
  if not candidates:raise RuntimeError('no compatible build-template evidence; run build-template first')
  _,source,manifest,modules=sorted(candidates)[-1];return source,manifest,modules
 def default_modules(cfg):
- data=tomllib.loads((cfg['_root']/'specfem_template/build_runtime.toml').read_text())
- return [['module','load',x] for x in data.get('environment',{}).get('modules',[])]
+ return [['module','load',x] for x in cfg['environment']['modules']]
+def environment_setup(cfg):
+ return '\n'.join(['module purge',f'if [[ -z "${{I_MPI_ROOT:-}}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source "{cfg["environment"]["oneapi_setup"]}"; fi',*[f'module load {x}' for x in cfg['environment']['modules']]])
 def lsf(cfg,row,run,module_commands=()):
- ranks=str(cfg['lsf']['mpi_ranks']);ptile=str(cfg['lsf']['ptile']);queue=cfg['lsf']['mpi_queue'];jobs=str(cfg['build']['make_jobs']);modules='\n'.join(shlex.join(x) for x in module_commands);workdir='${'+'LS_SUBCWD:-$PWD}'
+ ranks=str(cfg['lsf']['mpi_ranks']);ptile=str(cfg['lsf']['ptile']);queue=cfg['lsf']['mpi_queue'];jobs=str(cfg['build']['make_jobs']);modules=environment_setup(cfg);workdir='${'+'LS_SUBCWD:-$PWD}';launcher=cfg['environment']['mpi_launcher']
  def job(kind,exe):
   return f'''#!/usr/bin/env bash
 #BSUB -J PREM3S_{row['run_id']}_{kind}
@@ -32,7 +33,7 @@ set -euo pipefail
 cd "{workdir}"
 {modules}
 [[ -x bin/{exe} ]]
-mpirun -np "${{LSB_DJOB_NUMPROC:-{ranks}}}" ./bin/{exe}
+{launcher} -np "${{LSB_DJOB_NUMPROC:-{ranks}}}" ./bin/{exe}
 '''
  (run/'mesher_lsf.bash').write_text(job('mesher','xmeshfem3D'))
  (run/'solver_lsf.bash').write_text(job('solver','xspecfem3D'))

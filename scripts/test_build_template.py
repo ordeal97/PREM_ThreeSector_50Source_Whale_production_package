@@ -41,7 +41,7 @@ class BuildTests(unittest.TestCase):
     def test_mock_build_only_compiles(self):
         root, old = self.fixture()
         (root / 'config').mkdir()
-        (root / 'config/production.toml').write_text('[paths]\nruntime_root=".production_runtime"\n[source]\nrepository="unused"\ncommit="fixed"\n')
+        (root / 'config/production.toml').write_text('[paths]\nruntime_root=".production_runtime"\n[source]\nrepository="unused"\ncommit="fixed"\n[environment]\noneapi_setup="/setup.sh"\nmodules=["gcc/12"]\nmpi_launcher="mpirun"\n')
         data = root / 'specfem_template/DATA'
         data.mkdir(parents=True)
         for name in ('Par_file', 'CMTSOLUTION', 'STATIONS', 'ulvz_s40rts.par'):
@@ -71,7 +71,7 @@ class BuildTests(unittest.TestCase):
     def test_inspection_never_executes(self):
         root, old = self.fixture()
         (root / 'config').mkdir()
-        (root / 'config/production.toml').write_text('[paths]\nruntime_root=".production_runtime"\n[source]\nrepository="unused"\ncommit="fixed"\n')
+        (root / 'config/production.toml').write_text('[paths]\nruntime_root=".production_runtime"\n[source]\nrepository="unused"\ncommit="fixed"\n[environment]\noneapi_setup="/setup.sh"\nmodules=["gcc/12"]\nmpi_launcher="mpirun"\n')
         (root / 'specfem_template').mkdir()
         with patch('build_template.subprocess.run') as run:
             first = run_build(root, old, True)
