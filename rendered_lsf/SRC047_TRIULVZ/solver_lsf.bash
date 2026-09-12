@@ -9,9 +9,11 @@
 set -euo pipefail
 cd "${LS_SUBCWD:-$PWD}"
 module purge
-set +u
-source "/share/apps/intel/oneapi_2023.1.0/setvars.sh"
-set -u
+if ! command -v ifort >/dev/null 2>&1 || ! command -v mpiifort >/dev/null 2>&1 || ! command -v mpirun >/dev/null 2>&1; then
+  set +u
+  source /share/apps/intel/oneapi_2023.1.0/setvars.sh --force
+  set -u
+fi
 module load hdf5/1.14.3_oneapi2023
 command -v ifort >/dev/null 2>&1 || { echo "required command missing: ifort" >&2; exit 127; }
 command -v mpiifort >/dev/null 2>&1 || { echo "required command missing: mpiifort" >&2; exit 127; }

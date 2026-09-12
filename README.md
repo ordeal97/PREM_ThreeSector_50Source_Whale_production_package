@@ -31,4 +31,4 @@ python scripts/production_cli.py build-template \
 
 `submit` 在 Whale 上通过一个静态 control LSF 作业启动唯一的生产 controller；它只在 preflight 未过期、已 materialize、worktree 与冻结 DATA/LSF 一致且 `bsub` 可用时执行。`mock-submission` 是内存状态机测试：验证 100 个 run、并发上限 2 和 B0→TRIULVZ barrier，但不替代 Whale 的真实 LSF/mesher/solver 验证。
 
-Whale 依赖已冻结为 A+ 运行 profile：oneAPI 2023.1.0、`hdf5/1.14.3_oneapi2023`、`mpirun` 和 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`。运行 `deployment-check` 验证实际节点环境后，才允许 build/materialize/submit。
+Whale 依赖已冻结为 A+ 运行 profile：oneAPI 2023.1.0、`hdf5/1.14.3_oneapi2023`、`mpirun` 和 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`。环境初始化先检查 `ifort`、`mpiifort`、`mpirun`；只有缺失时才以 `setvars.sh --force` 补全，因此继承的 oneAPI 环境不会重复初始化失败。运行 `deployment-check` 验证实际节点环境后，才允许 build/materialize/submit。

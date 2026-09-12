@@ -9,7 +9,7 @@ from materialize_worktrees import lsf
 
 class ControlShellTests(unittest.TestCase):
  def test_rendered_control_uses_atomic_metadata_and_lsf_history_fallback(self):
-  root=Path(tempfile.mkdtemp());bindir=root/'bin';bindir.mkdir();setup=root/'setvars.sh';setup.write_text(':\n')
+  root=Path(tempfile.mkdtemp());bindir=root/'bin';bindir.mkdir();marker=root/'setvars-called';setup=root/'setvars.sh';setup.write_text('echo sourced >> "'+str(marker)+'"\nreturn 3\n')
   for name,body in {'module':'exit 0','ifort':'exit 0','mpiifort':'exit 0','mpirun':'exit 0','make':'exit 0','bjobs':'exit 0','bhist':'echo "Completed <done>"','bsub':'echo "Job <201> is submitted"'}.items():
    path=bindir/name;path.write_text('#!/usr/bin/env bash\n'+body+'\n');path.chmod(0o755)
   scratch=root/'scratch'/'A'/'DATABASES_MPI';scratch.mkdir(parents=True)
@@ -20,6 +20,12 @@ class ControlShellTests(unittest.TestCase):
   bash_env=root/'bash_env';bash_env.write_text('module() { :; }\n')
   env=dict(os.environ,PATH=str(bindir)+':'+os.environ['PATH'],LSB_JOBID='101',BASH_ENV=str(bash_env))
   subprocess.run(['bash',str(root/'submit_lsf.bash')],cwd=root,env=env,check=True)
+  (root/'bin').mkdir(exist_ok=True)
+  for name in ('xmeshfem3D','xspecfem3D'):
+   path=root/'bin'/name;path.write_text('#!/usr/bin/env bash\nexit 0\n');path.chmod(0o755)
+  subprocess.run(['bash',str(root/'mesher_lsf.bash')],cwd=root,env=env,check=True)
+  subprocess.run(['bash',str(root/'solver_lsf.bash')],cwd=root,env=env,check=True)
+  self.assertFalse(marker.exists())
   metadata=(root/'run_job_ids.env').read_text()
   self.assertIn('control_job_id=101',metadata);self.assertIn('mesher_job_id=201',metadata);self.assertIn('solver_job_id=201',metadata)
   self.assertIn('mesher_submission_state=CONFIRMED',metadata);self.assertIn('solver_submission_state=CONFIRMED',metadata)

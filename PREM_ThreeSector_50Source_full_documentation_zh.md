@@ -32,4 +32,4 @@ materialize 仅在 build evidence 兼容时创建 100 个独立 worktree。已�
 
 ## 已完成与部署边界
 
-本包已静态验证 rendered DATA、科学 audit、preflight、dry-run、LSF bash syntax 和 scheduler mock；这些检查没有调用 bsub、mesher 或 solver。部署时仍需检查 module/MPI 与 ASDF/HDF5、pinned-source build、LSF queue 和 384-rank ptile=64 host layout、scratch/共享文件系统、内存和存储，以及实际 mesher/solver/output QC 行为。详见 `design_summary.json` 与 `preflight/PREFLIGHT_REPORT.md`。
+本包已静态验证 rendered DATA、科学 audit、preflight、dry-run、LSF bash syntax 和 scheduler mock；这些检查没有调用 bsub、mesher 或 solver。oneAPI 初始化按实际 `ifort`、`mpiifort`、`mpirun` 命令决定是否执行 `setvars.sh --force`，因此控制作业继承的环境不会因重复 source 退出。部署时仍需检查 module/MPI 与 ASDF/HDF5、pinned-source build、LSF queue 和 384-rank ptile=64 host layout、scratch/共享文件系统、内存和存储，以及实际 mesher/solver/output QC 行为。详见 `design_summary.json` 与 `preflight/PREFLIGHT_REPORT.md`。

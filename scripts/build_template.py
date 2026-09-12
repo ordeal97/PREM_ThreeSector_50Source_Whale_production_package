@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import tomllib
+from production_common import environment_setup
 
 VARIABLES = {'FC', 'CC', 'CXX', 'MPIFC', 'MPICC', 'FCFLAGS', 'CFLAGS',
              'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'LIBS', 'ASDF_LIBS',
@@ -221,11 +222,7 @@ def run_build(root, reference, inspect_only=False, jobs=1, source_tree=None):
         recipe['commands'].append(argv)
         save()
         if environment:
-            setup = '\n'.join(['module purge','set +u',
-                f'source "{recipe["canonical_environment"]["oneapi_setup"]}"','set -u',
-                *[f'module load {item}' for item in recipe['canonical_environment']['modules']],
-                'command -v ifort >/dev/null 2>&1 || { echo "required command missing: ifort" >&2; exit 127; }',
-                'command -v mpiifort >/dev/null 2>&1 || { echo "required command missing: mpiifort" >&2; exit 127; }'])
+            setup = environment_setup(recipe['canonical_environment'])
             argv = ['bash', '-lc', 'set -e\n' + setup + '\nexec "$@"', 'build-template', *argv]
         with (output / 'build.log').open('a') as log:
             subprocess.run(argv, cwd=cwd, check=True, stdout=log, stderr=subprocess.STDOUT)

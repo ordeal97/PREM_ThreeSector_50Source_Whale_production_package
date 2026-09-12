@@ -1,6 +1,6 @@
 """Shared, conservative helpers for the Whale production runtime."""
 from __future__ import annotations
-import csv, hashlib, re, tomllib
+import csv, hashlib, re, shlex, tomllib
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -63,3 +63,10 @@ def worktree_errors(cfg,row):
   if value.get('run_id')!=row['run_id'] or value.get('source_commit')!=cfg['source']['commit'] or value.get('input_hashes')!=expected:errors.append('run_identity.json differs from frozen identity')
  except (OSError,ValueError):errors.append('run_identity.json missing or invalid')
  return errors
+
+def environment_setup(environment):
+ """Return Whale's idempotent oneAPI/HDF5 shell initialization."""
+ required=('ifort','mpiifort',environment['mpi_launcher'])
+ missing=' || '.join('! command -v '+shlex.quote(name)+' >/dev/null 2>&1' for name in required)
+ checks=['command -v '+shlex.quote(name)+' >/dev/null 2>&1 || { echo "required command missing: '+name+'" >&2; exit 127; }' for name in required]
+ return '\n'.join(['module purge','if '+missing+'; then','  set +u','  source '+shlex.quote(environment['oneapi_setup'])+' --force','  set -u','fi',*[f'module load {shlex.quote(item)}' for item in environment['modules']],*checks])
