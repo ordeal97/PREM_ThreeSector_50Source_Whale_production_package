@@ -10,6 +10,7 @@ python3 scripts/production_cli.py preflight
 python3 scripts/production_cli.py deployment-check
 python3 scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --inspect-only
 python3 scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --jobs 1
+python3 scripts/production_cli.py render
 python3 scripts/production_cli.py materialize
 python3 scripts/production_cli.py deployment-check
 python3 scripts/production_cli.py dry-run

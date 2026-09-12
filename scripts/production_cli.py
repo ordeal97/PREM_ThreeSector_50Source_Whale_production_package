@@ -25,7 +25,7 @@ exec {cfg['runtime']['python_bin']} {ROOT}/scripts/production_controller.py --co
 ''');return target
 def main():
  p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=ROOT/'config/production.toml');s=p.add_subparsers(dest='cmd',required=True)
- for name in ('validate','preflight','dry-run','deployment-check','mock-submission','materialize','status','resume','submit','cleanup'):s.add_parser(name)
+ for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup'):s.add_parser(name)
  b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
  for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
  a=p.parse_args();cfg=load_config(a.config)
@@ -37,6 +37,8 @@ def main():
   _,errors=run_preflight(False);print(json.dumps({'status':'FAIL' if errors else 'PASS','runs':100,'max_active_runs':cfg['lsf']['max_active_runs'],'stage_barrier':'all 50 B0 DONE + QC PASS','bsub_called':False,'mesher_called':False,'solver_called':False},indent=2));raise SystemExit(bool(errors))
  if a.cmd=='deployment-check':
   print(json.dumps({'deployment_time':True,'commands':{x:bool(shutil.which(x)) for x in ('bsub','bjobs','bhist','mpirun','make','git')},'build_manifest_present':any((runtime(cfg)['root']/'builds').glob('*/build_manifest.json')),'note':'does not invoke bsub/mesher/solver'},indent=2));return
+ if a.cmd=='render':
+  subprocess.run([sys.executable,str(ROOT/'scripts/render_lsf.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='materialize':
   gate();subprocess.run([sys.executable,str(ROOT/'scripts/materialize_worktrees.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='status':
