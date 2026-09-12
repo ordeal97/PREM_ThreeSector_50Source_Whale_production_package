@@ -74,9 +74,11 @@ submit_child solver solver_lsf.bash
  for path in (run/'mesher_lsf.bash',run/'solver_lsf.bash',run/'submit_lsf.bash'):path.chmod(0o755)
 def main():
  p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--source',type=Path);p.add_argument('--dry-run',action='store_true');p.add_argument('--refresh-lsf',action='store_true');p.add_argument('--run-id',action='append');a=p.parse_args();cfg=load_config(a.config)
- if a.source:source=a.source.resolve();modules=default_modules(cfg)
- else:source,_,modules=latest_build(cfg)
- if not (source/'configure').is_file():raise SystemExit('source tree lacks configure')
+ source=None;modules=default_modules(cfg)
+ if not a.refresh_lsf:
+  if a.source:source=a.source.resolve()
+  else:source,_,modules=latest_build(cfg)
+  if not (source/'configure').is_file():raise SystemExit('source tree lacks configure')
  created=[]
  status={}
  status_path=runtime(cfg)['status']
@@ -85,6 +87,7 @@ def main():
  for row in rows(cfg['paths']['manifest']):
   if selected and row['run_id'] not in selected:continue
   target=cfg['paths']['run_root']/row['run_id']
+  if a.refresh_lsf and not target.exists():raise SystemExit('cannot refresh missing worktree '+row['run_id'])
   if target.exists():
    if not (target/'DATA/Par_file').is_file():raise SystemExit('refusing non-worktree path '+str(target))
    ensure_runtime_dirs(target)
@@ -97,5 +100,6 @@ def main():
   shutil.copytree(source,target,ignore=IGNORE);shutil.copytree(cfg['paths']['inputs_dir']/row['run_id']/'DATA',target/'DATA',dirs_exist_ok=True)
   ensure_runtime_dirs(target);lsf(cfg,row,target,modules or default_modules(cfg))
   (target/'run_identity.json').write_text(json.dumps({'run_id':row['run_id'],'source_commit':cfg['source']['commit'],'input_hashes':{k:row[k] for k in ('par_file_sha256','cmtsolution_sha256','stations_sha256','ulvz_file_sha256')}},indent=2)+'\n')
- print(json.dumps({'source':str(source),'created':created,'count':len(created),'dry_run':a.dry_run},indent=2))
+ if selected and selected-{x['run_id'] for x in rows(cfg['paths']['manifest'])}:raise SystemExit('unknown run_id in --run-id')
+ print(json.dumps({'source':str(source) if source else None,'created':created,'count':len(created),'dry_run':a.dry_run,'refresh_lsf':a.refresh_lsf},indent=2))
 if __name__=='__main__':main()

@@ -23,6 +23,6 @@ python3 scripts/production_cli.py submit
 
 查询进度：`python3 scripts/production_cli.py status`。`resume` 仅接管未完成/未提交项，不会自动重试失败 run。失败 run 会在所有已知 control/mesher/solver 作业终态、诊断保存完成后自动清理其精确 scratch 目录；提交身份未确认或 cleanup 失败会阻止继续提交。仅在审阅失败证据后执行 `python3 scripts/production_cli.py resume --run-id SRC001_B0` 显式重试。cleanup 默认预览：`python3 scripts/production_cli.py cleanup --run-id SRC001_B0`；执行使用 `python3 scripts/production_cli.py cleanup --run-id SRC001_B0 --execute`，它会取得 controller 锁并再次检查所有已知作业终态。
 
-preflight hash 是 submit 硬门槛；config、manifest、template、DATA 或 rendered LSF 修改后必须重新 preflight。它也会审计已 materialize 的 worktree；旧 worktree 可用 `materialize --refresh-lsf [--run-id RUN_ID]` 显式刷新三份 LSF，活动 run 会被拒绝刷新。`ulvz_normalized.csv` 与 0/3-body manifest、1530 ASDF traces、510 个固定 station identity、每站 E/N/Z、10 Hz、25400 npts、有限值和 matched B0 payload 都在 runtime QC 中检查。
+preflight hash 是 submit 硬门槛；config、manifest、template、DATA 或 rendered LSF 修改后必须重新 preflight。它也会审计已 materialize 的 worktree；submit 在 bsub 前再次验证全部 100 个 worktree。旧 worktree 可用 `materialize --refresh-lsf [--run-id RUN_ID]` 显式刷新三份 LSF，此操作不需要 build-template evidence，活动 run 会被拒绝刷新。`ulvz_normalized.csv` 与 0/3-body manifest、1530 ASDF traces、510 个固定 station identity、每站 E/N/Z、10 Hz、25400 npts、有限值和 matched B0 payload 都在 runtime QC 中检查。
 
 仍需 deployment-time validation：Whale module/MPI、ASDF/HDF5 链接、384 rank/ptile=64 的 LSF host layout、scratch/共享文件系统、磁盘/内存配额以及真实 SPECFEM 输出。 

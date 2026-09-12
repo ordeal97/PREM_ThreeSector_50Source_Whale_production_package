@@ -4,13 +4,18 @@ from __future__ import annotations
 import argparse,json,shutil,subprocess,sys
 from pathlib import Path
 from preflight import ROOT,digest,tree_digest,run_preflight
-from production_common import load_config,runtime
+from production_common import load_config,rows,runtime,worktree_errors
 def hashes():return {'manifest_hash':digest(ROOT/'production_run_manifest.csv'),'config_hash':digest(ROOT/'config/production.toml'),'contract_hash':digest(ROOT/'config/contracts/prem_three_sector.toml'),'specfem_template_hash':tree_digest(ROOT/'specfem_template'),'rendered_input_hash':tree_digest(ROOT/'production_inputs'),'rendered_lsf_hash':tree_digest(ROOT/'rendered_lsf'),'runtime_script_hash':tree_digest(ROOT/'scripts')}
 def gate():
  p=ROOT/'preflight/preflight_summary.json'
  if not p.is_file():raise RuntimeError('preflight summary missing')
  s=json.loads(p.read_text());changed=[k for k,v in hashes().items() if s.get(k)!=v]
  if s.get('status')!='PASS' or changed:raise RuntimeError('submit refused: preflight invalid/stale '+','.join(changed))
+def materialized_gate(cfg):
+ errors=[]
+ for row in rows(cfg['paths']['manifest']):
+  for message in worktree_errors(cfg,row):errors.append(row['run_id']+': '+message)
+ if errors:raise RuntimeError('submit refused: worktree verification failed; '+'; '.join(errors))
 def control_lsf(cfg,action,retry=None):
  target=runtime(cfg)['root']/'rendered_lsf'/f'production_{action}.lsf';target.parent.mkdir(parents=True,exist_ok=True);(runtime(cfg)['root']/'logs').mkdir(parents=True,exist_ok=True)
  retry_arg='' if not retry else ' --retry '+retry
@@ -60,5 +65,6 @@ def main():
  gate()
  if not shutil.which('bsub'):raise RuntimeError('submit refused: bsub unavailable')
  if not (runtime(cfg)['root']/'production_status.csv').exists():raise RuntimeError('submit refused: materialize and deployment-check first')
+ materialized_gate(cfg)
  target=control_lsf(cfg,'run');subprocess.run(['bsub'],input=target.read_text(),text=True,check=True)
 if __name__=='__main__':main()

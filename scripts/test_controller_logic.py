@@ -1,11 +1,11 @@
-import tempfile
+import tempfile,sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from materialize_worktrees import ensure_runtime_dirs
+from materialize_worktrees import ensure_runtime_dirs,main as materialize_main
 from production_common import worktree_errors
-from production_cli import control_lsf
-from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, stage2_ready, submission_blocked, submit
+from production_cli import control_lsf,materialized_gate
+from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, scheduler, stage2_ready, submission_blocked, submit
 class ControllerLogic(unittest.TestCase):
  def setUp(self):
   self.cfg={'staging':{'stage1':'B0','stage2':'M3'}};self.manifest=[{'run_id':'A','stage':'B0'},{'run_id':'B','stage':'B0'},{'run_id':'C','stage':'M3'}]
@@ -85,6 +85,21 @@ class ControllerLogic(unittest.TestCase):
   self.assertEqual(worktree_errors(cfg,row),[])
   (run/'solver_lsf.bash').write_text('stale')
   self.assertTrue(worktree_errors(cfg,row))
+ def test_materialized_gate_rejects_missing_or_stale_tree(self):
+  cfg={'paths':{'manifest':Path('manifest')}}
+  with patch('production_cli.rows',return_value=[{'run_id':'A'}]),patch('production_cli.worktree_errors',return_value=['worktree missing']):
+   with self.assertRaises(RuntimeError):materialized_gate(cfg)
+ def test_scheduler_accepts_historical_done_successfully_text(self):
+  empty=type('Result',(),{'stdout':''})()
+  history=type('Result',(),{'stdout':'Done successfully'})()
+  with patch('production_controller.subprocess.run',side_effect=[empty,history]):self.assertEqual(scheduler('123'),'DONE')
+ def test_refresh_lsf_does_not_require_build_template_evidence(self):
+  root=Path(tempfile.mkdtemp());run=root/'work'/'A';(run/'DATA').mkdir(parents=True);(run/'DATA'/'Par_file').write_text('x')
+  manifest=root/'manifest.csv';row={'run_id':'A','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')}
+  cfg={'paths':{'manifest':manifest,'run_root':root/'work','runtime_root':root/'runtime'},'environment':{'oneapi_setup':'/setup','modules':['hdf5'],'mpi_launcher':'mpirun'},'lsf':{'mpi_ranks':1,'ptile':1,'mpi_queue':'mpi','control_queue':'serial','control_ranks':1,'control_hosts':1,'per_run_wait_seconds':1},'build':{'make_jobs':1,'mesher_target':'meshfem3D','solver_target':'specfem3D'}}
+  with patch('materialize_worktrees.load_config',return_value=cfg),patch('materialize_worktrees.rows',side_effect=lambda path:[row] if path==manifest else []),patch('materialize_worktrees.latest_build') as build,patch.object(sys,'argv',['materialize_worktrees.py','--config','x','--refresh-lsf','--run-id','A']):
+   materialize_main();build.assert_not_called()
+  self.assertTrue((run/'submit_lsf.bash').is_file())
  def test_submit_rejects_escape_or_unwritable_database_before_bsub(self):
   root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True);(run/'submit_lsf.bash').touch()
   cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}}

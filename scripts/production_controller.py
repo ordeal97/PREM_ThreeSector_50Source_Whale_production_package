@@ -23,7 +23,7 @@ def scheduler(job):
   p=r.stdout.splitlines()[1].split()
   if len(p)>2:return p[2]
  h=subprocess.run(['bhist','-l',job],text=True,capture_output=True).stdout.lower()
- return 'DONE' if 'completed <done>' in h else 'EXIT' if 'completed <exit>' in h else 'UNKNOWN'
+ return 'DONE' if 'completed <done>' in h or 'done successfully' in h else 'EXIT' if 'completed <exit>' in h or 'exited' in h else 'UNKNOWN'
 def stage2_ready(manifest,status,cfg):
  return all(status.get(x['run_id'],{}).get('state')=='DONE' and status.get(x['run_id'],{}).get('output_qc')=='PASS' for x in manifest if x['stage']==cfg['staging']['stage1'])
 def scratch_target(cfg,row):
