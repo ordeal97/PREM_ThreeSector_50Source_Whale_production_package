@@ -19,7 +19,7 @@ python3 scripts/production_cli.py dry-run
 python3 scripts/production_cli.py submit
 ```
 
-`build-template` 仅读取旧 build 的 configure/module 证据，固定 checkout `ordeal97/ulvz_specfem` commit `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9` 并重编 mesher；不复制旧二进制。materialize 为每个 run 创建独立可写源树、DATA、obj/bin 和 LSF。每 run control job 依序编 mesh、提交 mesher、等待成功、按本 run 新 header 编 solver、提交 solver。
+`build-template` 仅读取旧 build 的 configure/module 证据，固定 checkout `ordeal97/ulvz_specfem` commit `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9` 并重编 mesher；不复制旧二进制。Whale 离线时增加 `--source-tree /path/to/ulvz_specfem`，Git 树验证 HEAD；ZIP 解压树必须提供 `SOURCE_PROVENANCE.json` 和关键源码 SHA-256。源码先复制到独立 runtime 树，仍重新 configure，不复用旧 Makefile 或 header。materialize 为每个 run 创建独立可写源树、DATA、obj/bin 和 LSF。每 run control job 依序编 mesh、提交 mesher、等待成功、按本 run 新 header 编 solver、提交 solver。
 
 查询进度：`python3 scripts/production_cli.py status`。`resume` 仅接管未完成/未提交项，不会自动重试失败 run。仅在确认无活动作业、审阅失败证据后执行 `python3 scripts/production_cli.py resume --run-id SRC001_B0` 显式重试。QC PASS 后可先预览 cleanup：`python3 scripts/production_cli.py cleanup --run-id SRC001_B0`；没有 `--execute` 不会删除任何内容。若要执行，直接调用 `cleanup_scratch.py --execute`，且只允许 `DONE + output_qc PASS`。
 

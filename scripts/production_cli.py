@@ -27,13 +27,13 @@ exec {cfg['runtime']['python_bin']} {ROOT}/scripts/production_controller.py --co
 def main():
  p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=ROOT/'config/production.toml');s=p.add_subparsers(dest='cmd',required=True)
  for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup'):s.add_parser(name)
- b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
+ b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--source-tree',type=Path,help='离线本地 ulvz_specfem 源码树');b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
  for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
  a=p.parse_args();cfg=load_config(a.config)
  if a.cmd in {'validate','preflight'}:
   summary,errors=run_preflight(write_outputs=a.cmd=='preflight');print(a.cmd.upper(),summary['status']);raise SystemExit(bool(errors))
  if a.cmd=='build-template':
-  from build_template import run_build;run_build(ROOT,a.reference_build,a.inspect_only,a.jobs);return
+  from build_template import run_build;run_build(ROOT,a.reference_build,a.inspect_only,a.jobs,a.source_tree);return
  if a.cmd=='dry-run':
   _,errors=run_preflight(False);print(json.dumps({'status':'FAIL' if errors else 'PASS','runs':100,'max_active_runs':cfg['lsf']['max_active_runs'],'stage_barrier':'all 50 B0 DONE + QC PASS','bsub_called':False,'mesher_called':False,'solver_called':False},indent=2));raise SystemExit(bool(errors))
  if a.cmd=='deployment-check':

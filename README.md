@@ -13,6 +13,16 @@ python scripts/production_cli.py build-template --reference-build /path/to/old/s
 python scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --jobs 4
 ```
 
+Whale 无法访问 GitHub 时，提供本地源码树；该树必须是固定 commit，或无 `.git` 时包含经校验的 `SOURCE_PROVENANCE.json`：
+
+```bash
+python scripts/production_cli.py build-template \
+  --reference-build /share/home/yiy/ulvz/database_r1_Aplus/specfem0 \
+  --source-tree /path/to/ulvz_specfem --jobs 1
+```
+
+离线源码会先验证 commit/provenance 与关键源码 SHA-256，再复制到独立 runtime 树。原目录不会被修改；程序仍重新 configure 并编译 `meshfem3D`，不会复用旧的 Makefile、二进制或 mesher header。若 reference Makefile 出现 SPECFEM 正常生成的 `-I${SETUP}`、`MPICC=$(CC)`（ADIOS2=no）等差异，它们会进入审计但不阻断；其他未知差异仍阻断。
+
 第二条命令才会下载 config 中固定 commit 的源码，重新 configure 并编译 `meshfem3D`；不执行 mesher、solver 或 bsub。不复制旧二进制、Makefile 或 mesher header；公共 DATA 来自 `specfem_template`。
 
 自动读取 `config.status` 的 configure 参数，并核对 Makefile 中可识别的编译变量；只从旧目录顶层 `.sh`/`.lsf` 读取简单 module 命令，不执行旧脚本。复杂模块初始化、手工 Makefile 修改、无法恢复的参数需要人工处理。旧构建未启用 ASDF 时，仅在有 ASDF_LIBS 证据时补加 `--with-asdf`，否则拒绝构建。不会安装依赖或自动换编译器。请在与旧构建相同的 Whale 环境中执行，并检查继承报告中的 module 顺序和依赖路径。

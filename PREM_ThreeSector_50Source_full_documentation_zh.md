@@ -24,7 +24,7 @@ submit 前 `preflight_summary.json` 必须 PASS，且 config、contract、manife
 
 ## Whale 执行与控制
 
-完整命令顺序见 `PRODUCTION_RUNBOOK_zh.md`。build-template 从用户指定的旧 build 只读提取 configure 和简单 module 证据，在独立 runtime 目录 checkout pinned source、重新 configure 并编 mesher。旧二进制、Makefile 和 mesher header 不复用；缺 ASDF 证据、Makefile/config 冲突或工具链不完整会停止。
+完整命令顺序见 `PRODUCTION_RUNBOOK_zh.md`。build-template 从用户指定的旧 build 只读提取 configure 和简单 module 证据，在独立 runtime 目录 checkout pinned source、重新 configure 并编 mesher。无 GitHub 网络时使用 `--source-tree`：Git 树验证固定 HEAD；ZIP 树必须携带 `SOURCE_PROVENANCE.json`，程序重新验证关键源码 SHA-256。旧二进制、Makefile 和 mesher header 不复用；缺 ASDF 证据、未知 Makefile/config 冲突或工具链不完整会停止。SPECFEM Makefile.in 的已知派生差异只进入审计，不降低其他安全检查。
 
 materialize 仅在 build evidence 兼容时创建 100 个独立 worktree。controller 是唯一调用 bsub 的组件，使用原子 CSV、控制锁和配置的 `max_active_runs=2`。它不依赖 manifest 排序模拟阶段门槛：只有全部 B0 处于 DONE 且 output QC PASS，才选取 TRIULVZ。失败不会自动重试或删除 scratch；显式 retry 才改变状态。
 

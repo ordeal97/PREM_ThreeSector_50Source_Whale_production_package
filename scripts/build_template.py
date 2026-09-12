@@ -14,10 +14,40 @@ import tomllib
 VARIABLES = {'FC', 'CC', 'CXX', 'MPIFC', 'MPICC', 'FCFLAGS', 'CFLAGS',
              'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'LIBS', 'ASDF_LIBS',
              'HDF5_LIBS', 'HDF5_INC', 'HDF5_FCFLAGS'}
+SOURCE_COMMIT = '72f0c39117df9395c12fa901a9ae99fa3e7bdfd9'
+SOURCE_REPOSITORY = 'git@github.com:ordeal97/ulvz_specfem.git'
 
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _make_assignments(text):
+    """Parse only single physical make lines; never let whitespace cross a line."""
+    return {key: value.strip() for key, value in re.findall(
+        r'^(?P<key>[A-Za-z_][A-Za-z0-9_]*)[ \t]*=[ \t]*(?P<value>[^\r\n]*)$',
+        text, re.M)}
+
+
+def _makefile_differences(makefile, substitutions):
+    assignments = _make_assignments(makefile)
+    expected, blocking = [], []
+    for key, configured in substitutions.items():
+        if key not in VARIABLES or key not in assignments:
+            continue
+        actual = assignments[key]
+        reason = None
+        if key in {'CPPFLAGS', 'CXXFLAGS'} and actual == ('-I${SETUP}' + ((' ' + configured) if configured else '')):
+            reason = 'SPECFEM Makefile.in prepends -I${SETUP}'
+        elif key == 'MPICC' and actual == '$(CC)' and assignments.get('ADIOS2') == 'no' and assignments.get('CC') == configured:
+            reason = 'SPECFEM Makefile.in derives MPICC=$(CC) when ADIOS2=no'
+        item = {'variable': key, 'configured': configured, 'makefile': actual}
+        if reason:
+            item['reason'] = reason
+            expected.append(item)
+        elif actual != configured:
+            blocking.append(item)
+    return expected, blocking
 
 
 def inspect_reference(reference):
@@ -48,11 +78,9 @@ def inspect_reference(reference):
         if key not in variables and substitutions.get(key):
             variables[key] = substitutions[key]
     differences = []
+    expected_differences = []
     makefile = (reference / 'Makefile').read_text()
-    for key, value in re.findall(r'^(\w+)\s*=\s*(.*?)\s*$', makefile, re.M):
-        if key in VARIABLES and key in substitutions:
-            if value != substitutions[key]:
-                differences.append({'variable': key, 'configured': substitutions[key], 'makefile': value})
+    expected_differences, differences = _makefile_differences(makefile, substitutions)
     if differences:
         errors.append('Makefile differs from configure substitutions; manual review required')
     modules = []
@@ -98,15 +126,66 @@ def inspect_reference(reference):
             errors.append('ASDF is not enabled and no ASDF_LIBS evidence exists; provide an ASDF-enabled reference build')
     return {'reference': str(reference), 'options': options, 'variables': variables,
             'module_commands': modules, 'evidence_hashes': evidence,
-            'makefile_differences': differences, 'added_options': added, 'errors': errors}
+            'makefile_differences': differences,
+            'expected_makefile_differences': expected_differences,
+            'added_options': added, 'errors': errors}
 
 
-def run_build(root, reference, inspect_only=False, jobs=1):
+def _source_root(path):
+    path = Path(path).resolve(strict=True)
+    if (path / 'specfem3d_globe' / 'configure').is_file():
+        return path
+    if (path / 'configure').is_file() and path.name == 'specfem3d_globe':
+        return path.parent
+    raise RuntimeError('source-tree must contain specfem3d_globe/configure')
+
+
+def _verify_local_source(path, expected_commit):
+    source_root = _source_root(path)
+    git_root = None
+    try:
+        git_root = Path(subprocess.check_output(['git', '-C', str(source_root), 'rev-parse', '--show-toplevel'], text=True, stderr=subprocess.DEVNULL).strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    if git_root:
+        head = subprocess.check_output(['git', '-C', str(source_root), 'rev-parse', 'HEAD'], text=True).strip()
+        if head != expected_commit:
+            raise RuntimeError(f'Offline source commit mismatch: {head} != {expected_commit}')
+        return source_root, {'mode': 'offline_git', 'verified_commit': head}
+    provenance = source_root / 'SOURCE_PROVENANCE.json'
+    if not provenance.is_file():
+        raise RuntimeError('Offline source without .git requires SOURCE_PROVENANCE.json')
+    data = json.loads(provenance.read_text())
+    if data.get('repository') != SOURCE_REPOSITORY or data.get('commit') != expected_commit:
+        raise RuntimeError('Offline SOURCE_PROVENANCE.json repository/commit mismatch')
+    hashes = data.get('key_source_hashes')
+    if not isinstance(hashes, dict) or not hashes:
+        raise RuntimeError('Offline SOURCE_PROVENANCE.json must include key_source_hashes')
+    for rel, expected in hashes.items():
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or '..' in rel_path.parts:
+            raise RuntimeError(f'Offline source key path escapes source tree: {rel}')
+        target = source_root / rel_path
+        if not target.is_file() or sha(target) != expected:
+            raise RuntimeError(f'Offline source key hash mismatch: {rel}')
+    return source_root, {'mode': 'offline_archive', 'verified_commit': expected_commit, 'key_source_hashes': hashes}
+
+
+def _copy_clean_source(source_root, destination):
+    ignored = {'bin', 'obj', 'DATABASES_MPI', 'OUTPUT_FILES', 'Makefile', 'config.status', 'config.log', 'values_from_mesher.h'}
+    def ignore(_directory, names):
+        return {name for name in names if name in ignored or name == '.git'}
+    shutil.copytree(source_root, destination, ignore=ignore)
+
+
+def run_build(root, reference, inspect_only=False, jobs=1, source_tree=None):
     if jobs < 1:
         raise ValueError('jobs must be positive')
     recipe = inspect_reference(reference)
     config = tomllib.loads((root / 'config/production.toml').read_text())
     recipe['source'] = config['source']
+    if recipe['source'].get('commit') != SOURCE_COMMIT:
+        raise RuntimeError('production.toml source commit is not the validated multi-ULVZ commit')
     environment = config['environment']
     recipe['canonical_environment'] = environment
     expected_loads = {f'module load {item}' for item in environment['modules']}
@@ -122,6 +201,7 @@ def run_build(root, reference, inspect_only=False, jobs=1):
     recipe['status'] = 'BLOCKED' if recipe['errors'] else 'INSPECTED'
     recipe['solver_status'] = 'PENDING_RUN_SPECIFIC_MESHER_HEADER'
     recipe['commands'] = []
+    recipe['source_mode'] = 'offline' if source_tree else 'github_clone'
 
     def save():
         (output / 'build_manifest.json').write_text(json.dumps(recipe, indent=2) + '\n')
@@ -150,12 +230,17 @@ def run_build(root, reference, inspect_only=False, jobs=1):
 
     try:
         checkout = output / 'source'
-        execute(['git', 'clone', '--no-checkout', recipe['source']['repository'], str(checkout)], output)
-        execute(['git', 'checkout', '--detach', recipe['source']['commit']], checkout)
-        head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=checkout, text=True).strip()
-        if head != recipe['source']['commit']:
-            raise RuntimeError('Source commit mismatch')
-        recipe['verified_commit'] = head
+        if source_tree:
+            verified_root, source_evidence = _verify_local_source(source_tree, recipe['source']['commit'])
+            _copy_clean_source(verified_root, checkout)
+            recipe.update(source_evidence)
+        else:
+            execute(['git', 'clone', '--no-checkout', recipe['source']['repository'], str(checkout)], output)
+            execute(['git', 'checkout', '--detach', recipe['source']['commit']], checkout)
+            head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=checkout, text=True).strip()
+            if head != recipe['source']['commit']:
+                raise RuntimeError('Source commit mismatch')
+            recipe['verified_commit'] = head
         source = checkout / 'specfem3d_globe'
         if not (source / 'configure').is_file():
             raise RuntimeError('Pinned source lacks specfem3d_globe/configure')
