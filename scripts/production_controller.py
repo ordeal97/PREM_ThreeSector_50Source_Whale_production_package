@@ -101,9 +101,11 @@ def process_success_cleanup(cfg,row):
 def submission_blocked(status):return any(x.get('scratch_cleaned')=='false' for x in status.values())
 def counts_as_active(status,states):return status.get('state') in ACTIVE or (status.get('state') in FAILURES and not all_terminal(states))
 def submit(cfg,row):
- run=cfg['paths']['run_root']/row['run_id'];_,scratch=scratch_target(cfg,row)
+ run=cfg['paths']['run_root']/row['run_id'];_,run_scratch=scratch_target(cfg,row);database=Path(row['scratch_database_path']).resolve(strict=False)
+ if database!=run_scratch/'DATABASES_MPI':raise RuntimeError('manifest scratch database path mismatch')
  if not (run/'submit_lsf.bash').is_file():raise RuntimeError('missing materialized worktree '+row['run_id'])
- scratch.mkdir(parents=True,exist_ok=True)
+ database.mkdir(parents=True,exist_ok=True)
+ if not database.is_dir() or not os.access(database,os.W_OK):raise RuntimeError('scratch database path is not writable: '+str(database))
  r=subprocess.run(['bash','-lc','bsub < submit_lsf.bash'],cwd=run,text=True,capture_output=True);m=re.search(r'Job <(\d+)>',r.stdout)
  if r.returncode or not m:fail(cfg,row,'SUBMIT','bsub_submission_failed');return
  update(cfg,row['run_id'],'state=CONTROL_PEND','control_job_id='+m.group(1),'submit_time='+now())

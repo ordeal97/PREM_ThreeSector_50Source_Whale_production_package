@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from materialize_worktrees import ensure_runtime_dirs
 from production_cli import control_lsf
-from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, stage2_ready, submission_blocked
+from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, stage2_ready, submission_blocked, submit
 class ControllerLogic(unittest.TestCase):
  def setUp(self):
   self.cfg={'staging':{'stage1':'B0','stage2':'M3'}};self.manifest=[{'run_id':'A','stage':'B0'},{'run_id':'B','stage':'B0'},{'run_id':'C','stage':'M3'}]
@@ -62,4 +62,23 @@ class ControllerLogic(unittest.TestCase):
    with patch('production_controller.state',return_value={'A':status}),patch('production_controller.process_failure'),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
     fail(cfg,row,stage,'test')
    self.assertTrue(any(want in ' '.join(str(x) for x in call) and 'failure_stage='+stage in ' '.join(str(x) for x in call) for call in updates))
+ def test_submit_creates_manifest_database_path_before_mocked_bsub(self):
+  root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True);(run/'submit_lsf.bash').write_text('#!/usr/bin/env bash\n')
+  database=root/'scratch'/'A'/'DATABASES_MPI';cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}};row={'run_id':'A','stage':'B0','scratch_database_path':str(database)};updates=[]
+  def fake_bsub(*args,**kwargs):
+   self.assertTrue(database.is_dir());self.assertTrue((root/'scratch'/'A').is_dir())
+   return type('Result',(),{'returncode':0,'stdout':'Job <123> is submitted'})()
+  with patch('production_controller.subprocess.run',side_effect=fake_bsub),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
+   submit(cfg,row);submit(cfg,row)
+  self.assertTrue(any('control_job_id=123' in str(x) for x in updates))
+ def test_submit_rejects_escape_or_unwritable_database_before_bsub(self):
+  root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True);(run/'submit_lsf.bash').touch()
+  cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}}
+  with patch('production_controller.subprocess.run') as bsub:
+   with self.assertRaises(RuntimeError):submit(cfg,{'run_id':'A','stage':'B0','scratch_database_path':str(root/'outside'/'DATABASES_MPI')})
+   bsub.assert_not_called()
+  database=root/'scratch'/'A'/'DATABASES_MPI';row={'run_id':'A','stage':'B0','scratch_database_path':str(database)}
+  with patch('production_controller.os.access',return_value=False),patch('production_controller.subprocess.run') as bsub:
+   with self.assertRaises(RuntimeError):submit(cfg,row)
+   bsub.assert_not_called()
 if __name__=='__main__':unittest.main()
