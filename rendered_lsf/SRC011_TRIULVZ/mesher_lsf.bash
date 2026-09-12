@@ -3,6 +3,7 @@
 #BSUB -q mpi
 #BSUB -n 384
 #BSUB -R "span[ptile=64]"
+#BSUB -L /bin/bash
 #BSUB -o logs/mesher-%J.out
 #BSUB -e logs/mesher-%J.err
 set -euo pipefail

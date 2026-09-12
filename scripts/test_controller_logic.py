@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from materialize_worktrees import ensure_runtime_dirs
+from production_common import worktree_errors
 from production_cli import control_lsf
 from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, stage2_ready, submission_blocked, submit
 class ControllerLogic(unittest.TestCase):
@@ -23,6 +24,7 @@ class ControllerLogic(unittest.TestCase):
   cfg={'lsf':{'control_job_prefix':'p','control_queue':'serial','control_ranks':1,'control_hosts':1},'runtime':{'python_bin':'python3'},'_root':root,'_path':root/'config.toml','paths':{'runtime_root':root/'runtime'}}
   control_lsf(cfg,'run')
   self.assertTrue((root/'runtime/logs').is_dir())
+  self.assertIn('#BSUB -L /bin/bash',(root/'runtime/rendered_lsf/production_run.lsf').read_text())
  def test_job_terminal_guard_and_retry_guard(self):
   self.assertTrue(all_terminal({'control_job_id':'EXIT','mesher_job_id':'DONE','solver_job_id':'EXIT'}))
   for state in ('RUN','PEND','UNKNOWN'):
@@ -68,17 +70,39 @@ class ControllerLogic(unittest.TestCase):
   def fake_bsub(*args,**kwargs):
    self.assertTrue(database.is_dir());self.assertTrue((root/'scratch'/'A').is_dir())
    return type('Result',(),{'returncode':0,'stdout':'Job <123> is submitted'})()
-  with patch('production_controller.subprocess.run',side_effect=fake_bsub),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
+  with patch('production_controller.worktree_errors',return_value=[]),patch('production_controller.subprocess.run',side_effect=fake_bsub),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
    submit(cfg,row);submit(cfg,row)
   self.assertTrue(any('control_job_id=123' in str(x) for x in updates))
+ def test_worktree_gate_rejects_stale_rendered_lsf(self):
+  root=Path(tempfile.mkdtemp());rid='A';inputs=root/'inputs'/rid/'DATA';rendered=root/'rendered_lsf'/rid;run=root/'work'/rid
+  inputs.mkdir(parents=True);rendered.mkdir(parents=True);(run/'DATA').mkdir(parents=True)
+  for name in ('Par_file','CMTSOLUTION','STATIONS','ulvz_s40rts.par'):(inputs/name).write_text(name);(run/'DATA'/name).write_text(name)
+  for name in ('submit_lsf.bash','mesher_lsf.bash','solver_lsf.bash'):(rendered/name).write_text(name);(run/name).write_text(name)
+  row={'run_id':rid,'par_file_sha256':'p','cmtsolution_sha256':'c','stations_sha256':'s','ulvz_file_sha256':'u'}
+  import json
+  (run/'run_identity.json').write_text(json.dumps({'run_id':rid,'source_commit':'commit','input_hashes':{'par_file_sha256':'p','cmtsolution_sha256':'c','stations_sha256':'s','ulvz_file_sha256':'u'}}))
+  cfg={'paths':{'run_root':root/'work','inputs_dir':root/'inputs'},'_root':root,'source':{'commit':'commit'}}
+  self.assertEqual(worktree_errors(cfg,row),[])
+  (run/'solver_lsf.bash').write_text('stale')
+  self.assertTrue(worktree_errors(cfg,row))
  def test_submit_rejects_escape_or_unwritable_database_before_bsub(self):
   root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True);(run/'submit_lsf.bash').touch()
   cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}}
-  with patch('production_controller.subprocess.run') as bsub:
+  with patch('production_controller.worktree_errors',return_value=[]),patch('production_controller.subprocess.run') as bsub:
    with self.assertRaises(RuntimeError):submit(cfg,{'run_id':'A','stage':'B0','scratch_database_path':str(root/'outside'/'DATABASES_MPI')})
    bsub.assert_not_called()
   database=root/'scratch'/'A'/'DATABASES_MPI';row={'run_id':'A','stage':'B0','scratch_database_path':str(database)}
-  with patch('production_controller.os.access',return_value=False),patch('production_controller.subprocess.run') as bsub:
+  with patch('production_controller.worktree_errors',return_value=[]),patch('production_controller.os.access',return_value=False),patch('production_controller.subprocess.run') as bsub:
    with self.assertRaises(RuntimeError):submit(cfg,row)
    bsub.assert_not_called()
+ def test_failure_cleanup_does_not_overwrite_completed_attempt(self):
+  root=Path(tempfile.mkdtemp());cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}};row={'run_id':'A','stage':'B0','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')}
+  status={'state':'EXIT','attempt':'0','scratch_cleaned':'true'}
+  with patch('production_controller.state',return_value={'A':status}),patch('production_controller.write_failed') as record,patch('production_controller.remove_scratch') as clean:
+   self.assertTrue(process_failure(cfg,row));record.assert_not_called();clean.assert_not_called()
+ def test_pending_child_submission_prevents_failure_cleanup(self):
+  root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True);(run/'run_job_ids.env').write_text('mesher_submission_state=PENDING\n')
+  cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}};row={'run_id':'A','stage':'B0','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')};status={'state':'EXIT','attempt':'0'}
+  with patch('production_controller.state',return_value={'A':status}),patch('production_controller.write_failed') as record,patch('production_controller.remove_scratch') as clean:
+   self.assertFalse(process_failure(cfg,row));record.assert_called();clean.assert_not_called()
 if __name__=='__main__':unittest.main()

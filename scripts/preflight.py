@@ -12,6 +12,7 @@ import tomllib
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from production_common import load_config,worktree_errors
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -137,9 +138,15 @@ def run_preflight(write_outputs: bool = True) -> tuple[dict,list[str]]:
     if sorted(assigned)!=sorted(instance_by): fail(errors,"parameter instances do not map one-to-one")
     p_nodes=sum(float(x[f"{sector}_P_near_node_fraction"])>.5 for x in sources for sector in "ABC")
     s_nodes=sum(float(x[f"{sector}_S_near_node_fraction"])>.5 for x in sources for sector in "ABC")
+    runtime_cfg=load_config(config_path);existing_worktrees=0
+    for row in manifest:
+        if (runtime_cfg['paths']['run_root']/row['run_id']).exists():
+            existing_worktrees+=1
+            for message in worktree_errors(runtime_cfg,row):fail(errors,f"{row['run_id']}: worktree {message}")
     warnings=["deployment-time validation required for Whale module/MPI/ASDF-HDF5, scratch filesystem, compiled executable and resource availability","no bsub, mesher or solver was invoked by preflight"]
+    if existing_worktrees!=len(manifest):warnings.append(f"worktree verification pending: {existing_worktrees}/{len(manifest)} materialized")
     if p_nodes or s_nodes: warnings.append(f"radiation diagnostic: P near-node source-sector cells={p_nodes}/150; S={s_nodes}/150; project proxy only, inspect source_radiation audit before deployment")
-    summary={"status":"PASS" if not errors else "FAIL","timestamp":datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"manifest_hash":digest(ROOT/"production_run_manifest.csv"),"config_hash":digest(config_path),"contract_hash":digest(contract_path),"specfem_template_hash":tree_digest(ROOT/"specfem_template"),"rendered_input_hash":tree_digest(ROOT/"production_inputs"),"rendered_lsf_hash":tree_digest(ROOT/"rendered_lsf"),"runtime_script_hash":tree_digest(ROOT/"scripts"),"source_count":len(sources),"run_count":len(manifest),"station_count":len(stations),"active_ulvz_instances":len(instances),"minimum_clearance_km":min(float(x["clearance_km"]) for x in clearance),"radiation_near_node_cells":{"P":p_nodes,"S":s_nodes},"warnings":warnings,"errors":errors}
+    summary={"status":"PASS" if not errors else "FAIL","timestamp":datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"manifest_hash":digest(ROOT/"production_run_manifest.csv"),"config_hash":digest(config_path),"contract_hash":digest(contract_path),"specfem_template_hash":tree_digest(ROOT/"specfem_template"),"rendered_input_hash":tree_digest(ROOT/"production_inputs"),"rendered_lsf_hash":tree_digest(ROOT/"rendered_lsf"),"runtime_script_hash":tree_digest(ROOT/"scripts"),"source_count":len(sources),"run_count":len(manifest),"station_count":len(stations),"active_ulvz_instances":len(instances),"materialized_worktrees":existing_worktrees,"minimum_clearance_km":min(float(x["clearance_km"]) for x in clearance),"radiation_near_node_cells":{"P":p_nodes,"S":s_nodes},"warnings":warnings,"errors":errors}
     if write_outputs:
         out=ROOT/"preflight"; out.mkdir(exist_ok=True)
         if audit:

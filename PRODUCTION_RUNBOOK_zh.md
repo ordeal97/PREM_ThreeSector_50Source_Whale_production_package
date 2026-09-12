@@ -21,8 +21,8 @@ python3 scripts/production_cli.py submit
 
 `build-template` 仅读取旧 build 的 configure/module 证据，固定 checkout `ordeal97/ulvz_specfem` commit `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9` 并重编 mesher；不复制旧二进制。Whale 离线时增加 `--source-tree /path/to/ulvz_specfem`，Git 树验证 HEAD；ZIP 解压树必须提供 `SOURCE_PROVENANCE.json` 和关键源码 SHA-256。源码先复制到独立 runtime 树，仍重新 configure，不复用旧 Makefile 或 header。materialize 为每个 run 创建独立可写源树、DATA、obj/bin 和 LSF。每 run control job 依序编 mesh、提交 mesher、等待成功、按本 run 新 header 编 solver、提交 solver。
 
-查询进度：`python3 scripts/production_cli.py status`。`resume` 仅接管未完成/未提交项，不会自动重试失败 run。仅在确认无活动作业、审阅失败证据后执行 `python3 scripts/production_cli.py resume --run-id SRC001_B0` 显式重试。QC PASS 后可先预览 cleanup：`python3 scripts/production_cli.py cleanup --run-id SRC001_B0`；没有 `--execute` 不会删除任何内容。若要执行，直接调用 `cleanup_scratch.py --execute`，且只允许 `DONE + output_qc PASS`。
+查询进度：`python3 scripts/production_cli.py status`。`resume` 仅接管未完成/未提交项，不会自动重试失败 run。失败 run 会在所有已知 control/mesher/solver 作业终态、诊断保存完成后自动清理其精确 scratch 目录；提交身份未确认或 cleanup 失败会阻止继续提交。仅在审阅失败证据后执行 `python3 scripts/production_cli.py resume --run-id SRC001_B0` 显式重试。cleanup 默认预览：`python3 scripts/production_cli.py cleanup --run-id SRC001_B0`；执行使用 `python3 scripts/production_cli.py cleanup --run-id SRC001_B0 --execute`，它会取得 controller 锁并再次检查所有已知作业终态。
 
-preflight hash 是 submit 硬门槛；config、manifest、template、DATA 或 rendered LSF 修改后必须重新 preflight。`ulvz_normalized.csv` 与 0/3-body manifest、1530 ASDF traces、510 stations、10 Hz、25400 npts、有限值和 matched B0 payload 都在 runtime QC 中检查。EXIT/QC_FAIL 永不自动 cleanup。
+preflight hash 是 submit 硬门槛；config、manifest、template、DATA 或 rendered LSF 修改后必须重新 preflight。它也会审计已 materialize 的 worktree；旧 worktree 可用 `materialize --refresh-lsf [--run-id RUN_ID]` 显式刷新三份 LSF，活动 run 会被拒绝刷新。`ulvz_normalized.csv` 与 0/3-body manifest、1530 ASDF traces、510 个固定 station identity、每站 E/N/Z、10 Hz、25400 npts、有限值和 matched B0 payload 都在 runtime QC 中检查。
 
 仍需 deployment-time validation：Whale module/MPI、ASDF/HDF5 链接、384 rank/ptile=64 的 LSF host layout、scratch/共享文件系统、磁盘/内存配额以及真实 SPECFEM 输出。 

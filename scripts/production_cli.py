@@ -19,6 +19,7 @@ def control_lsf(cfg,action,retry=None):
 #BSUB -q {cfg['lsf']['control_queue']}
 #BSUB -n {cfg['lsf']['control_ranks']}
 #BSUB -R "span[hosts={cfg['lsf']['control_hosts']}]"
+#BSUB -L /bin/bash
 #BSUB -o {runtime(cfg)['root']}/logs/{action}-%J.out
 #BSUB -e {runtime(cfg)['root']}/logs/{action}-%J.err
 set -euo pipefail
@@ -29,6 +30,7 @@ def main():
  for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup'):s.add_parser(name)
  b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--source-tree',type=Path,help='离线本地 ulvz_specfem 源码树');b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
  for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
+ s.choices['cleanup'].add_argument('--execute',action='store_true')
  a=p.parse_args();cfg=load_config(a.config)
  if a.cmd in {'validate','preflight'}:
   summary,errors=run_preflight(write_outputs=a.cmd=='preflight');print(a.cmd.upper(),summary['status']);raise SystemExit(bool(errors))
@@ -46,7 +48,9 @@ def main():
   subprocess.run([sys.executable,str(ROOT/'scripts/production_controller.py'),'--config',str(a.config),'--action','status'],check=True);return
  if a.cmd=='cleanup':
   if not a.run_id:raise SystemExit('cleanup requires --run-id')
-  subprocess.run([sys.executable,str(ROOT/'scripts/cleanup_scratch.py'),'--config',str(a.config),'--run-id',a.run_id],check=True);return
+  command=[sys.executable,str(ROOT/'scripts/cleanup_scratch.py'),'--config',str(a.config),'--run-id',a.run_id]
+  if a.execute:command.append('--execute')
+  subprocess.run(command,check=True);return
  if a.cmd=='resume':
   gate()
   if not shutil.which('bsub'):raise RuntimeError('resume refused: bsub unavailable')

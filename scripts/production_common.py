@@ -44,3 +44,22 @@ def render(text, values):
 
 def run_row(cfg, run_id):
  return next((x for x in rows(cfg['paths']['manifest']) if x['run_id']==run_id),None)
+
+def worktree_errors(cfg,row):
+ """Compare an existing runtime tree with the frozen portable package."""
+ run=cfg['paths']['run_root']/row['run_id'];errors=[]
+ if not run.is_dir():return ['worktree missing']
+ for name in ('Par_file','CMTSOLUTION','STATIONS','ulvz_s40rts.par'):
+  actual=run/'DATA'/name;expected=cfg['paths']['inputs_dir']/row['run_id']/'DATA'/name
+  if not actual.is_file() or not expected.is_file() or sha(actual)!=sha(expected):errors.append('DATA/'+name+' differs from frozen input')
+ for name in ('submit_lsf.bash','mesher_lsf.bash','solver_lsf.bash'):
+  actual=run/name;expected=cfg['_root']/'rendered_lsf'/row['run_id']/name
+  if not actual.is_file() or not expected.is_file() or sha(actual)!=sha(expected):errors.append(name+' differs from rendered LSF')
+ identity=run/'run_identity.json'
+ try:
+  import json
+  value=json.loads(identity.read_text())
+  expected={key:row[key] for key in ('par_file_sha256','cmtsolution_sha256','stations_sha256','ulvz_file_sha256')}
+  if value.get('run_id')!=row['run_id'] or value.get('source_commit')!=cfg['source']['commit'] or value.get('input_hashes')!=expected:errors.append('run_identity.json differs from frozen identity')
+ except (OSError,ValueError):errors.append('run_identity.json missing or invalid')
+ return errors

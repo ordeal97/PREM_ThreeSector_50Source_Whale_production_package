@@ -18,7 +18,7 @@ Whale 的运行 profile 继承 A+ package：control Python 为 `/share/home/yiy/
 
 ## 输入冻结与 preflight
 
-`production_run_manifest.csv`、catalogs、100 份 `production_inputs/*/DATA`、`rendered_lsf/` 与母包共同定义冻结输入。`scripts/preflight.py` 从 rendered DATA 对照 source、station、parameter、instance 与 manifest；检查 50/510/100/150 计数、39/4/3/1/3 深度配额、0/3 bodies、zero taper、clearance、唯一 scratch、公共 Par_file、source pairing 与阶段身份。`preflight/all_runs_parameter_audit.csv` 是一行一个 run 的人工审查总表。
+`production_run_manifest.csv`、catalogs、100 份 `production_inputs/*/DATA`、`rendered_lsf/` 与母包共同定义冻结输入。`scripts/preflight.py` 从 rendered DATA 对照 source、station、parameter、instance 与 manifest；检查 50/510/100/150 计数、39/4/3/1/3 深度配额、0/3 bodies、zero taper、clearance、唯一 scratch、公共 Par_file、source pairing 与阶段身份。若 worktree 已存在，也逐项比对实际 DATA、三份 LSF 与 identity；不一致会使 preflight 失败。`preflight/all_runs_parameter_audit.csv` 是一行一个 run 的人工审查总表。
 
 submit 前 `preflight_summary.json` 必须 PASS，且 config、contract、manifest、template、DATA、rendered LSF hashes 与当时结果一致。任意修改均使 gate 过期；不会 warning 后继续提交。
 
@@ -26,9 +26,9 @@ submit 前 `preflight_summary.json` 必须 PASS，且 config、contract、manife
 
 完整命令顺序见 `PRODUCTION_RUNBOOK_zh.md`。build-template 从用户指定的旧 build 只读提取 configure 和简单 module 证据，在独立 runtime 目录 checkout pinned source、重新 configure 并编 mesher。无 GitHub 网络时使用 `--source-tree`：Git 树验证固定 HEAD；ZIP 树必须携带 `SOURCE_PROVENANCE.json`，程序重新验证关键源码 SHA-256。旧二进制、Makefile 和 mesher header 不复用；缺 ASDF 证据、未知 Makefile/config 冲突或工具链不完整会停止。SPECFEM Makefile.in 的已知派生差异只进入审计，不降低其他安全检查。
 
-materialize 仅在 build evidence 兼容时创建 100 个独立 worktree。controller 是唯一调用 bsub 的组件，使用原子 CSV、控制锁和配置的 `max_active_runs=2`。它不依赖 manifest 排序模拟阶段门槛：只有全部 B0 处于 DONE 且 output QC PASS，才选取 TRIULVZ。失败不会自动重试或删除 scratch；显式 retry 才改变状态。
+materialize 仅在 build evidence 兼容时创建 100 个独立 worktree。已有 tree 默认不覆盖；`--refresh-lsf` 是显式的三份 LSF 刷新操作，并拒绝活动 run。controller 是唯一调用 bsub 的组件，使用原子 CSV、控制锁和配置的 `max_active_runs=2`。per-run control 使用原子 job metadata、`bjobs`/`bhist` 状态回退和独立 LSF 资源声明。它不依赖 manifest 排序模拟阶段门槛：只有全部 B0 处于 DONE 且 output QC PASS，才选取 TRIULVZ。失败不会自动 retry；只有所有已知作业终态、诊断已保存且 scratch 成功清理后才可显式 retry。
 
-运行后 QC 读取 `OUTPUT_FILES/ulvz_normalized.csv`，逐 body 核对中心、R/H、dVs/dVp/dRho、taper 和 N_ULVZ；ASDF 必须有 510 台、1530 BXE/BXN/BXZ traces、10 Hz、25400 samples 与有限值。TRIULVZ 和 matched B0 全部 waveform payload bitwise identical 时失败；不要求每站响应。cleanup 默认 preview，执行时只允许 DONE+PASS 的精确 scratch target。
+运行后 QC 读取 `OUTPUT_FILES/ulvz_normalized.csv`，严格核对 PREM background、B0 的一条 N_ULVZ=0 provenance 和 TRIULVZ 的三条唯一 body、中心、R/H、dVs/dVp/dRho、taper；NaN/Inf 会失败。ASDF 必须有 510 个固定 station identity、每站唯一 E/N/Z、1530 traces、10 Hz、25400 samples 与有限值。TRIULVZ 和 matched B0 全部 waveform payload bitwise identical 时失败；不要求每站响应。cleanup 默认 preview，`--execute` 时才会在作业终态检查后清理精确 scratch target。
 
 ## 已完成与部署边界
 

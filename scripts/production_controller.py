@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse,csv,fcntl,json,os,re,shutil,subprocess,sys,tempfile,time
 from datetime import datetime,timezone
 from pathlib import Path
-from production_common import load_config,rows,runtime
+from production_common import load_config,rows,runtime,worktree_errors
 
 ACTIVE={'CONTROL_PEND','CONTROL_RUN','MESHER','SOLVER','QC','CLEANUP_PENDING'}
 FAILURES={'EXIT','QC_FAIL'}
@@ -47,6 +47,11 @@ def job_ids(run,status):
    key,sep,value=raw.partition('=')
    if sep and key in result and value:result[key]=value
  return result
+def submission_pending(run):
+ meta=run/'run_job_ids.env'
+ if not meta.is_file():return False
+ values=dict(line.split('=',1) for line in meta.read_text(errors='replace').splitlines() if '=' in line)
+ return any(values.get(key)=='PENDING' for key in ('mesher_submission_state','solver_submission_state'))
 def job_states(run,status):return {key:scheduler(value) for key,value in job_ids(run,status).items() if value}
 def all_terminal(states):return all(value in {'DONE','EXIT'} for value in states.values())
 def write_failed(cfg,row,status,states,size):
@@ -82,6 +87,9 @@ def fail(cfg,row,stage,reason):
  process_failure(cfg,row)
 def process_failure(cfg,row):
  status=state(cfg)[row['run_id']];run=cfg['paths']['run_root']/row['run_id'];states=job_states(run,status);_,target=scratch_target(cfg,row);size=scratch_size(target)
+ if status.get('scratch_cleaned')=='true':return True
+ if submission_pending(run):
+  states['submission_pending']='true';write_failed(cfg,row,status,states,size);return False
  write_failed(cfg,row,status,states,size)
  if not all_terminal(states):return False
  try:preserve_diagnostics(cfg,row,status)
@@ -93,6 +101,7 @@ def process_failure(cfg,row):
  update(cfg,row['run_id'],'scratch_cleaned=true','cleanup_time='+now(),'cleanup_error=');write_failed(cfg,row,state(cfg)[row['run_id']],states,size);return True
 def process_success_cleanup(cfg,row):
  status=state(cfg)[row['run_id']];states=job_states(cfg['paths']['run_root']/row['run_id'],status)
+ if status.get('scratch_cleaned')=='true':return True
  if not all_terminal(states):return False
  try:remove_scratch(cfg,row)
  except Exception as exc:
@@ -104,6 +113,8 @@ def submit(cfg,row):
  run=cfg['paths']['run_root']/row['run_id'];_,run_scratch=scratch_target(cfg,row);database=Path(row['scratch_database_path']).resolve(strict=False)
  if database!=run_scratch/'DATABASES_MPI':raise RuntimeError('manifest scratch database path mismatch')
  if not (run/'submit_lsf.bash').is_file():raise RuntimeError('missing materialized worktree '+row['run_id'])
+ errors=worktree_errors(cfg,row)
+ if errors:raise RuntimeError('worktree differs from frozen package '+row['run_id']+': '+'; '.join(errors))
  database.mkdir(parents=True,exist_ok=True)
  if not database.is_dir() or not os.access(database,os.W_OK):raise RuntimeError('scratch database path is not writable: '+str(database))
  r=subprocess.run(['bash','-lc','bsub < submit_lsf.bash'],cwd=run,text=True,capture_output=True);m=re.search(r'Job <(\d+)>',r.stdout)

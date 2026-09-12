@@ -3,6 +3,7 @@
 #BSUB -q mpi
 #BSUB -n 384
 #BSUB -R "span[ptile=64]"
+#BSUB -L /bin/bash
 #BSUB -o logs/solver-%J.out
 #BSUB -e logs/solver-%J.err
 set -euo pipefail
