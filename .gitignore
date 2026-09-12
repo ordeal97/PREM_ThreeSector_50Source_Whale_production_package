@@ -1,0 +1,14 @@
+.production_runtime/
+worktrees/
+DATABASES_MPI/
+OUTPUT_FILES/
+obj/
+bin/
+scratch/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+hostfile.*
+run_job_ids.env
+.mesh_solver_control.lock/

@@ -1,0 +1,3 @@
+# Validated multi-ULVZ interface; zero taper is fixed for this design.
+BACKGROUND_MODEL = PREM
+N_ULVZ = 0

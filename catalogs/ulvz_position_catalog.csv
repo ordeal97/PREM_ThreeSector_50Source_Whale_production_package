@@ -1,0 +1,25 @@
+position_id,sector,base_position_id,latitude_deg,longitude_deg,rotation_deg,cmb_radius_km,provenance
+A_G01,A,G01,-0.50000000,49.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G02,A,G02,0.50000000,52.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G03,A,G03,0.00000000,46.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G04,A,G04,0.00000000,55.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G05,A,G05,0.00000000,59.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G06,A,G06,0.00000000,62.50000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G07,A,G07,-2.50000000,52.00000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+A_G08,A,G08,2.50000000,50.00000000,0.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G01,B,G01,-40.85466479,-30.83981523,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G02,B,G02,-43.74113282,-32.58662529,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G03,B,G03,-38.91690376,-27.78430053,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G04,B,G04,-45.53792330,-36.03605854,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G05,B,G05,-48.26164894,-40.32564815,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G06,B,G06,-50.19019001,-43.84549898,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G07,B,G07,-41.29820323,-35.04531474,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+B_G08,B,G08,-43.20354590,-28.23813616,120.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G01,C,G01,41.51905367,-29.84667315,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G02,C,G02,43.05301016,-33.58525590,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G03,C,G03,38.91690376,-27.78430053,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G04,C,G04,45.53792330,-36.03605854,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G05,C,G05,48.26164894,-40.32564815,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G06,C,G06,50.19019001,-43.84549898,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G07,C,G07,44.71634893,-30.05173316,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis
+C_G08,C,G08,39.86439939,-33.21280998,240.0,3480.0,A+ canonical G01-G08 rotated about source radial axis

@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "timestamp": "2026-09-12T13:49:29Z",
+  "manifest_hash": "4909ab52098907dd97a1e907b3213b96c5bc70b38d7c04e91cf34b7041c63fcb",
+  "config_hash": "814a370d903c0e3e00dff4839670155dfd6814de8f40d6ba91c9e9a3fb7a37fa",
+  "contract_hash": "37c864e60b5e0a0fb507cca0dce1e0c7649d86b1af839d92a303c16fbc9b6442",
+  "specfem_template_hash": "8f53cf462ab64c7a025211a45deb528b30dd71afcda7d8c3762d2f33daeb3902",
+  "rendered_input_hash": "08061db5fa31f3929f3f951b4482ca7ffc10b196ffb04807aec9e1ae2c4de09c",
+  "rendered_lsf_hash": "faa20989158f6577bc775d3dc7f826bc6aa57d8a733548f5bb403a345b90a730",
+  "runtime_script_hash": "a613597a062b1c0e4a68510fb21b8e154321f82151a7fd76c846784f7015b56d",
+  "source_count": 50,
+  "run_count": 100,
+  "station_count": 510,
+  "active_ulvz_instances": 150,
+  "minimum_clearance_km": 3417.427613,
+  "radiation_near_node_cells": {
+    "P": 7,
+    "S": 0
+  },
+  "warnings": [
+    "deployment-time validation required for Whale module/MPI/ASDF-HDF5, scratch filesystem, compiled executable and resource availability",
+    "no bsub, mesher or solver was invoked by preflight",
+    "radiation diagnostic: P near-node source-sector cells=7/150; S=0/150; project proxy only, inspect source_radiation audit before deployment"
+  ],
+  "errors": []
+}

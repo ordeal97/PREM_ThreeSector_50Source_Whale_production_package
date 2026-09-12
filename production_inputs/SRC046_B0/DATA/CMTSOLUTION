@@ -1,0 +1,13 @@
+PDE 2000  1  1  0  0  0.00   0.0000    0.0000  0.0 0.0 0.0 SRC046
+event name:     SRC046
+time shift:      0.0000
+half duration:   0.0000
+latitude:        0.0000
+longitude:       0.0000
+depth:           165.2000
+Mrr: -3.34565303e+25
+Mtt: -1.82126699e+25
+Mpp:  5.16692002e+25
+Mrt: -3.06536597e+25
+Mrp: -9.85167216e+25
+Mtp:  4.70880238e+24

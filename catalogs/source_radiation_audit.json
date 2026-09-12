@@ -1,0 +1,17 @@
+{
+  "source_count": 50,
+  "depth_bins": {
+    "0-70": 39,
+    "70-150": 4,
+    "150-300": 3,
+    "300-500": 1,
+    "500-700": 3
+  },
+  "mechanisms": {
+    "normal": 9,
+    "thrust": 21,
+    "strike_slip": 20
+  },
+  "method": "fixed depth\u00d7mechanism quota; deterministic depth-quantile candidate pool; P/Pdiff and S/Sdiff three-sector radiation proxy ranking",
+  "diagnostic_note": "near_node_fraction <0.05 amplitude is a project screening diagnostic, not a waveform detection threshold"
+}

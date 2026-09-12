@@ -1,0 +1,33 @@
+[identity]
+name = "PREM_three_sector_50source"
+[design]
+run_count = 100
+source_count = 50
+baseline_count = 50
+multi_count = 50
+station_count = 510
+active_ulvz_instances = 150
+[inputs]
+background_model = "PREM"
+nchunks = 6
+nex_xi = 448
+nex_eta = 448
+nproc_xi = 8
+nproc_eta = 8
+mpi_ranks = 384
+record_length_minutes = 42
+dt_s = 0.1
+expected_nstep = 25400
+expected_npts = 25400
+[physics]
+oceans = false
+ellipticity = true
+topography = false
+gravity = true
+rotation = true
+attenuation = true
+absorbing_conditions = false
+[staging]
+stage1 = "stage1_baseline"
+stage2 = "stage2_multi"
+require_all_stage1_qc_pass = true

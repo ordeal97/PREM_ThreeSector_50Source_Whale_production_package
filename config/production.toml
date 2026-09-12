@@ -1,0 +1,31 @@
+[paths]
+run_root = "worktrees"
+scratch_root = "/scratch/yiy/ulvz"
+manifest = "production_run_manifest.csv"
+inputs_dir = "production_inputs"
+runtime_root = ".production_runtime"
+status_template = "production_status_template.csv"
+[lsf]
+mpi_queue = "mpi"
+mpi_ranks = 384
+ptile = 64
+max_active_runs = 2
+controller_poll_seconds = 300
+per_run_wait_seconds = 240
+control_queue = "serial"
+control_ranks = 1
+[runtime]
+python_bin = "python3"
+[build]
+mesher_target = "meshfem3D"
+solver_target = "specfem3D"
+make_jobs = 1
+[qc]
+cleanup_after_output_qc_pass = true
+[staging]
+stage1 = "stage1_baseline"
+stage2 = "stage2_multi"
+require_all_stage1_qc_pass = true
+[source]
+repository = "git@github.com:ordeal97/ulvz_specfem.git"
+commit = "72f0c39117df9395c12fa901a9ae99fa3e7bdfd9"

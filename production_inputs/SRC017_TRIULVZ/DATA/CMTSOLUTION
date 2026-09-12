@@ -1,0 +1,13 @@
+PDE 2000  1  1  0  0  0.00   0.0000    0.0000  0.0 0.0 0.0 SRC017
+event name:     SRC017
+time shift:      0.0000
+half duration:   0.0000
+latitude:        0.0000
+longitude:       0.0000
+depth:           15.5000
+Mrr:  3.48782369e+24
+Mtt:  8.82058676e+25
+Mpp: -9.16936913e+25
+Mrt: -1.37791388e+25
+Mrp:  2.77268155e+25
+Mtp:  3.45948745e+25

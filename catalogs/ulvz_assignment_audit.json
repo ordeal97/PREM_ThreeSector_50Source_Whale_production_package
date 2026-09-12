@@ -1,0 +1,16 @@
+{
+  "seed": 20260912,
+  "instance_count": 150,
+  "by_sector": {
+    "A": 50,
+    "B": 50,
+    "C": 50
+  },
+  "by_parameter_source": {
+    "family_interpolant": 66,
+    "legacy_parameter_anchor": 33,
+    "survey_family_sample": 51
+  },
+  "minimum_clearance_km": 3417.427613,
+  "all_clearance_pass": true
+}

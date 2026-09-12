@@ -1,0 +1,13 @@
+PDE 2000  1  1  0  0  0.00   0.0000    0.0000  0.0 0.0 0.0 SRC020
+event name:     SRC020
+time shift:      0.0000
+half duration:   0.0000
+latitude:        0.0000
+longitude:       0.0000
+depth:           17.7000
+Mrr:  0.00000000e+00
+Mtt: -9.82886761e+25
+Mpp:  9.82886761e+25
+Mrt: -1.69609344e+24
+Mrp: -1.20683319e+25
+Mtp:  1.38135726e+25

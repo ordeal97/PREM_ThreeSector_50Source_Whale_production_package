@@ -1,0 +1,19 @@
+{
+  "latest": {
+    "source_id": "SRC001",
+    "station_id": "AU135AM20p0",
+    "sector": "A",
+    "source_depth_km": "12.0000",
+    "distance_deg": "135.00000000",
+    "phase_family": "SS",
+    "actual_phase": "SS",
+    "arrival_time_s": "2387.132820"
+  },
+  "safety_margin_s": 120,
+  "required_duration_s": 2507.13282,
+  "record_length_minutes": 42,
+  "dt_s": 0.1,
+  "expected_nstep": 25400,
+  "expected_npts": 25400,
+  "note": "NSTEP includes SPECFEM start-time/half-duration rounding allowance; deployment solver output must confirm"
+}

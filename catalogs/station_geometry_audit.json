@@ -1,0 +1,10 @@
+{
+  "station_count": 510,
+  "by_sector": {
+    "A": 170,
+    "B": 170,
+    "C": 170
+  },
+  "unique_coordinate_count": 510,
+  "rotation": "source-axis strict spherical rotation; positive azimuth +120/+240"
+}

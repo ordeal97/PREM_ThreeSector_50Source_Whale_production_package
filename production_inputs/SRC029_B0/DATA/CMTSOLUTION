@@ -1,0 +1,13 @@
+PDE 2000  1  1  0  0  0.00   0.0000    0.0000  0.0 0.0 0.0 SRC029
+event name:     SRC029
+time shift:      0.0000
+half duration:   0.0000
+latitude:        0.0000
+longitude:       0.0000
+depth:           28.7000
+Mrr:  7.19846310e+25
+Mtt: -2.28028386e+25
+Mpp: -4.91817924e+25
+Mrt: -4.45315611e+25
+Mrp:  7.29376166e+25
+Mtp:  3.64748411e+25

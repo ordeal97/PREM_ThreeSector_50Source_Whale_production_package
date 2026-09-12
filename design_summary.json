@@ -1,0 +1,71 @@
+{
+  "deployment_time_validation": [
+    "Whale module/MPI and ASDF/HDF5 compatibility",
+    "pinned source build and executable link audit",
+    "LSF queue, 384-rank host layout, memory and storage",
+    "scratch and shared filesystem access",
+    "actual mesher/solver/output-QC behavior"
+  ],
+  "dry_run_status": "PASS",
+  "dt_s": 0.1,
+  "expected_npts": 25400,
+  "key_paths": {
+    "all_runs_audit": "preflight/all_runs_parameter_audit.csv",
+    "instance_manifest": "catalogs/ulvz_instance_manifest.csv",
+    "manifest": "production_run_manifest.csv",
+    "parameter_catalog": "catalogs/ulvz_parameter_catalog.csv",
+    "preflight_report": "preflight/PREFLIGHT_REPORT.md",
+    "source_catalog": "catalogs/source_ensemble.csv",
+    "station_catalog": "catalogs/station_geometry.csv",
+    "template": "specfem_template"
+  },
+  "max_active_runs": 2,
+  "mechanism_counts": {
+    "normal": 9,
+    "strike_slip": 20,
+    "thrust": 21
+  },
+  "mock_submission_status": "PASS",
+  "mpi_ranks": 384,
+  "n_baseline_runs": 50,
+  "n_multi_runs": 50,
+  "n_runs": 100,
+  "n_sources": 50,
+  "n_station_sectors": 3,
+  "n_stations": 510,
+  "n_ulvz_baseline": 0,
+  "n_ulvz_instances": 150,
+  "n_ulvz_multi": 3,
+  "nchunks": 6,
+  "nstep": 25400,
+  "package_schema_version": "1.1",
+  "parameter_source_counts": {
+    "family_interpolant": 66,
+    "legacy_parameter_anchor": 33,
+    "survey_family_sample": 51
+  },
+  "physics_settings": {
+    "absorbing_conditions": false,
+    "attenuation": true,
+    "ellipticity": true,
+    "gravity": true,
+    "oceans": false,
+    "rotation": true,
+    "topography": false
+  },
+  "preflight_status": "PASS",
+  "ptile": 64,
+  "record_length_min": 42,
+  "source_depth_quota": {
+    "0-70": 39,
+    "150-300": 3,
+    "300-500": 1,
+    "500-700": 3,
+    "70-150": 4
+  },
+  "specfem_source_commit": "72f0c39117df9395c12fa901a9ae99fa3e7bdfd9",
+  "specfem_source_repository": "git@github.com:ordeal97/ulvz_specfem.git",
+  "stage_barrier": "all stage1_baseline runs must be DONE with output_qc PASS before stage2_multi is eligible",
+  "validate_status": "PASS",
+  "zero_taper": true
+}
