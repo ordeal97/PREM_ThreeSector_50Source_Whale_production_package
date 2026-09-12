@@ -5,7 +5,7 @@ import argparse,csv,os,tempfile
 from pathlib import Path
 
 ACTIVE={'CONTROL_PEND','CONTROL_RUN','MESHER','SOLVER','QC'}
-REQUIRED=('run_id','state','output_qc','reason','attempt','control_job_id','mesher_job_id','solver_job_id','submit_time','finish_time','scratch_cleaned')
+REQUIRED=('run_id','state','output_qc','reason','attempt','control_job_id','mesher_job_id','solver_job_id','submit_time','finish_time','scratch_cleaned','failure_stage','failure_time','cleanup_time','cleanup_error')
 def read(p):
  with p.open(newline='') as f:
   r=csv.DictReader(f);return list(r),r.fieldnames
@@ -31,6 +31,13 @@ def main():
    write(a.status,initial,fields)
   return
  rows,fields=read(a.status)
+ changed=False
+ for field in REQUIRED:
+  if field not in fields:fields.append(field);changed=True
+ for row in rows:
+  for field in fields:
+   if field not in row:row[field]='';changed=True
+ if changed:write(a.status,rows,fields)
  if a.cmd=='active': print(*[x['run_id'] for x in rows if x['state'] in ACTIVE],sep='\n');return
  if a.cmd=='active-count':print(sum(x['state'] in ACTIVE for x in rows));return
  if a.cmd=='dump':print(a.status.read_text(),end='');return

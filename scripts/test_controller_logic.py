@@ -1,5 +1,10 @@
+import tempfile
 import unittest
-from production_controller import stage2_ready
+from pathlib import Path
+from unittest.mock import patch
+from materialize_worktrees import ensure_runtime_dirs
+from production_cli import control_lsf
+from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, stage2_ready, submission_blocked
 class ControllerLogic(unittest.TestCase):
  def setUp(self):
   self.cfg={'staging':{'stage1':'B0','stage2':'M3'}};self.manifest=[{'run_id':'A','stage':'B0'},{'run_id':'B','stage':'B0'},{'run_id':'C','stage':'M3'}]
@@ -9,4 +14,52 @@ class ControllerLogic(unittest.TestCase):
  def test_stage2_unlocks_only_on_done_and_pass(self):
   state={'A':{'state':'DONE','output_qc':'PASS'},'B':{'state':'DONE','output_qc':'PASS'}}
   self.assertTrue(stage2_ready(self.manifest,state,self.cfg))
+ def test_worktree_runtime_directories_are_created_idempotently(self):
+  target=Path(tempfile.mkdtemp())/'run'
+  ensure_runtime_dirs(target);ensure_runtime_dirs(target)
+  self.assertTrue(all((target/name).is_dir() for name in ('obj','bin','OUTPUT_FILES','logs')))
+ def test_control_lsf_creates_runtime_logs(self):
+  root=Path(tempfile.mkdtemp())
+  cfg={'lsf':{'control_job_prefix':'p','control_queue':'serial','control_ranks':1,'control_hosts':1},'runtime':{'python_bin':'python3'},'_root':root,'_path':root/'config.toml','paths':{'runtime_root':root/'runtime'}}
+  control_lsf(cfg,'run')
+  self.assertTrue((root/'runtime/logs').is_dir())
+ def test_job_terminal_guard_and_retry_guard(self):
+  self.assertTrue(all_terminal({'control_job_id':'EXIT','mesher_job_id':'DONE','solver_job_id':'EXIT'}))
+  for state in ('RUN','PEND','UNKNOWN'):
+   self.assertFalse(all_terminal({'control_job_id':'EXIT','solver_job_id':state}))
+  scratch=Path(tempfile.mkdtemp())/'missing'
+  self.assertTrue(retry_ready({'state':'EXIT','scratch_cleaned':'true'},{'control_job_id':'EXIT'},scratch))
+  self.assertFalse(retry_ready({'state':'EXIT','scratch_cleaned':'true'},{'control_job_id':'RUN'},scratch))
+  self.assertFalse(retry_ready({'state':'QC_FAIL','scratch_cleaned':'false'},{'solver_job_id':'EXIT'},scratch))
+ def test_cleanup_failure_blocks_submissions(self):
+  self.assertTrue(submission_blocked({'A':{'scratch_cleaned':'false'}}))
+  self.assertFalse(submission_blocked({'A':{'scratch_cleaned':'true'},'B':{'scratch_cleaned':''}}))
+  self.assertTrue(counts_as_active({'state':'EXIT'},{'control_job_id':'EXIT','mesher_job_id':'RUN'}))
+  self.assertFalse(counts_as_active({'state':'EXIT'},{'control_job_id':'EXIT','mesher_job_id':'EXIT'}))
+ def test_failure_cleanup_waits_for_live_child_and_records_cleanup_failure(self):
+  root=Path(tempfile.mkdtemp());run=root/'work'/'A';run.mkdir(parents=True)
+  cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'},'_root':root}
+  row={'run_id':'A','stage':'B0','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')}
+  status={'state':'EXIT','attempt':'0','failure_stage':'CONTROL','reason':'control_exit'}
+  with patch('production_controller.state',return_value={'A':status}),patch('production_controller.job_states',return_value={'control_job_id':'EXIT','mesher_job_id':'RUN'}),patch('production_controller.write_failed') as record,patch('production_controller.preserve_diagnostics') as preserve,patch('production_controller.remove_scratch') as clean:
+   self.assertFalse(process_failure(cfg,row));record.assert_called();preserve.assert_not_called();clean.assert_not_called()
+  updates=[]
+  with patch('production_controller.state',return_value={'A':status}),patch('production_controller.job_states',return_value={'control_job_id':'EXIT','mesher_job_id':'EXIT'}),patch('production_controller.write_failed'),patch('production_controller.preserve_diagnostics'),patch('production_controller.remove_scratch',side_effect=OSError('no space')),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
+   self.assertFalse(process_failure(cfg,row))
+  self.assertTrue(any('scratch_cleaned=false' in x for call in updates for x in call))
+ def test_success_cleanup_removes_declared_scratch_after_terminal_jobs(self):
+  root=Path(tempfile.mkdtemp());target=root/'scratch'/'A';(target/'DATABASES_MPI').mkdir(parents=True);(target/'DATABASES_MPI'/'x').write_text('x')
+  cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}};row={'run_id':'A','scratch_database_path':str(target/'DATABASES_MPI')}
+  remove_scratch(cfg,row);self.assertFalse(target.exists())
+  updates=[];status={'attempt':'0'}
+  with patch('production_controller.state',return_value={'A':status}),patch('production_controller.job_states',return_value={'solver_job_id':'DONE'}),patch('production_controller.remove_scratch'),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
+   self.assertTrue(process_success_cleanup(cfg,row))
+  self.assertTrue(any('state=DONE' in ' '.join(str(x) for x in call) and 'scratch_cleaned=true' in ' '.join(str(x) for x in call) for call in updates))
+ def test_mesher_solver_control_and_qc_failures_keep_their_stage(self):
+  root=Path(tempfile.mkdtemp());cfg={'paths':{'run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'}};row={'run_id':'A','stage':'B0','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')}
+  for stage,want in (('MESHER','state=EXIT'),('SOLVER','state=EXIT'),('CONTROL','state=EXIT'),('QC','state=QC_FAIL')):
+   status={'state':'SOLVER','attempt':'0','output_qc':''};updates=[]
+   with patch('production_controller.state',return_value={'A':status}),patch('production_controller.process_failure'),patch('production_controller.update',side_effect=lambda *x:updates.append(x)):
+    fail(cfg,row,stage,'test')
+   self.assertTrue(any(want in ' '.join(str(x) for x in call) and 'failure_stage='+stage in ' '.join(str(x) for x in call) for call in updates))
 if __name__=='__main__':unittest.main()

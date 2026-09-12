@@ -34,7 +34,7 @@ def load_config(path: Path):
  cfg['_root']=ROOT;cfg['_path']=path.resolve();return cfg
 
 def runtime(cfg):
- root=cfg['paths']['runtime_root'];return {'root':root,'status':root/'production_status.csv','qc':root/'qc','lock':root/'controller.lock'}
+ root=cfg['paths']['runtime_root'];return {'root':root,'status':root/'production_status.csv','qc':root/'qc','failed':root/'failed_runs.csv','diagnostics':root/'failed_diagnostics','lock':root/'controller.lock'}
 
 def render(text, values):
  for key,value in values.items(): text=text.replace('@@'+key+'@@',str(value))

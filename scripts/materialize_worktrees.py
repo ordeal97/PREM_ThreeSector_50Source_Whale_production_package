@@ -6,6 +6,9 @@ from pathlib import Path
 from production_common import load_config,rows
 
 IGNORE=shutil.ignore_patterns('.git','obj','bin','DATABASES_MPI','OUTPUT_FILES','logs','__pycache__')
+RUNTIME_DIRS=('obj','bin','OUTPUT_FILES','logs')
+def ensure_runtime_dirs(target):
+ for name in RUNTIME_DIRS:(target/name).mkdir(parents=True,exist_ok=True)
 def latest_build(cfg):
  builds=cfg['paths']['runtime_root']/'builds';candidates=[]
  for manifest in builds.glob('*/build_manifest.json') if builds.is_dir() else ():
@@ -67,11 +70,12 @@ def main():
   target=cfg['paths']['run_root']/row['run_id']
   if target.exists():
    if not (target/'DATA/Par_file').is_file():raise SystemExit('refusing non-worktree path '+str(target))
+   ensure_runtime_dirs(target)
    continue
   created.append(row['run_id'])
   if a.dry_run:continue
   shutil.copytree(source,target,ignore=IGNORE);shutil.copytree(cfg['paths']['inputs_dir']/row['run_id']/'DATA',target/'DATA',dirs_exist_ok=True)
-  (target/'logs').mkdir(exist_ok=True);lsf(cfg,row,target,modules or default_modules(cfg))
+  ensure_runtime_dirs(target);lsf(cfg,row,target,modules or default_modules(cfg))
   (target/'run_identity.json').write_text(json.dumps({'run_id':row['run_id'],'source_commit':cfg['source']['commit'],'input_hashes':{k:row[k] for k in ('par_file_sha256','cmtsolution_sha256','stations_sha256','ulvz_file_sha256')}},indent=2)+'\n')
  print(json.dumps({'source':str(source),'created':created,'count':len(created),'dry_run':a.dry_run},indent=2))
 if __name__=='__main__':main()

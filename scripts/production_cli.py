@@ -12,7 +12,7 @@ def gate():
  s=json.loads(p.read_text());changed=[k for k,v in hashes().items() if s.get(k)!=v]
  if s.get('status')!='PASS' or changed:raise RuntimeError('submit refused: preflight invalid/stale '+','.join(changed))
 def control_lsf(cfg,action,retry=None):
- target=runtime(cfg)['root']/'rendered_lsf'/f'production_{action}.lsf';target.parent.mkdir(parents=True,exist_ok=True)
+ target=runtime(cfg)['root']/'rendered_lsf'/f'production_{action}.lsf';target.parent.mkdir(parents=True,exist_ok=True);(runtime(cfg)['root']/'logs').mkdir(parents=True,exist_ok=True)
  retry_arg='' if not retry else ' --retry '+retry
  target.write_text(f'''#!/usr/bin/env bash
 #BSUB -J {cfg['lsf']['control_job_prefix']}_PREM3S_{action}
