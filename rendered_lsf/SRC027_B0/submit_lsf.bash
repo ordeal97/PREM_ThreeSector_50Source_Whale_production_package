@@ -3,8 +3,13 @@
 set -euo pipefail
 cd "${LS_SUBCWD:-$PWD}"; mkdir -p logs
 module purge
-if [[ -z "${I_MPI_ROOT:-}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source "/share/apps/intel/oneapi_2023.1.0/setvars.sh"; fi
+set +u
+source "/share/apps/intel/oneapi_2023.1.0/setvars.sh"
+set -u
 module load hdf5/1.14.3_oneapi2023
+command -v ifort >/dev/null 2>&1 || { echo "required command missing: ifort" >&2; exit 127; }
+command -v mpiifort >/dev/null 2>&1 || { echo "required command missing: mpiifort" >&2; exit 127; }
+command -v mpirun >/dev/null 2>&1 || { echo "required command missing: mpirun" >&2; exit 127; }
 [[ -d "/scratch/yiy/ulvz/SRC027_B0/DATABASES_MPI/" && -w "/scratch/yiy/ulvz/SRC027_B0/DATABASES_MPI/" ]]
 lock=.mesh_solver_control.lock; mkdir "$lock" || { echo "active control lock" >&2; exit 2; }
 trap 'rmdir "$lock" 2>/dev/null || true' EXIT

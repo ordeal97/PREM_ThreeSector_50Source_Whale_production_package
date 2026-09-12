@@ -21,7 +21,7 @@ def latest_build(cfg):
 def default_modules(cfg):
  return [['module','load',x] for x in cfg['environment']['modules']]
 def environment_setup(cfg):
- return '\n'.join(['module purge',f'if [[ -z "${{I_MPI_ROOT:-}}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source "{cfg["environment"]["oneapi_setup"]}"; fi',*[f'module load {x}' for x in cfg['environment']['modules']]])
+ return '\n'.join(['module purge','set +u',f'source "{cfg["environment"]["oneapi_setup"]}"','set -u',*[f'module load {x}' for x in cfg['environment']['modules']],*['command -v '+name+' >/dev/null 2>&1 || { echo "required command missing: '+name+'" >&2; exit 127; }' for name in ('ifort','mpiifort',cfg['environment']['mpi_launcher'])]])
 def lsf(cfg,row,run,module_commands=()):
  ranks=str(cfg['lsf']['mpi_ranks']);ptile=str(cfg['lsf']['ptile']);queue=cfg['lsf']['mpi_queue'];jobs=str(cfg['build']['make_jobs']);modules=environment_setup(cfg);workdir='${'+'LS_SUBCWD:-$PWD}';launcher=cfg['environment']['mpi_launcher']
  def job(kind,exe):

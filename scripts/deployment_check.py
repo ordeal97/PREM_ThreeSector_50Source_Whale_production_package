@@ -7,7 +7,7 @@ from production_common import load_config
 
 def main():
  p=__import__('argparse').ArgumentParser();p.add_argument('--config',type=Path,required=True);a=p.parse_args();cfg=load_config(a.config);env=cfg['environment']
- setup='\n'.join(['set -e','module purge',f'if [[ -z "${{I_MPI_ROOT:-}}" ]] || ! command -v mpiifort >/dev/null 2>&1; then source {shlex.quote(env["oneapi_setup"])}; fi',*[f'module load {shlex.quote(x)}' for x in env['modules']],f'command -v {shlex.quote(env["mpi_launcher"])}','command -v mpiifort','command -v mpiicc'])
+ setup='\n'.join(['set -e','module purge','set +u',f'source {shlex.quote(env["oneapi_setup"])}','set -u',*[f'module load {shlex.quote(x)}' for x in env['modules']],'command -v ifort','command -v mpiifort','command -v mpiicc',f'command -v {shlex.quote(env["mpi_launcher"])}'])
  shell=subprocess.run(['bash','-lc',setup],text=True,capture_output=True)
  try:
   python=subprocess.run([cfg['runtime']['python_bin'],'-c','import sys,h5py,numpy; assert sys.version_info >= (3,11); print(sys.version.split()[0]); print(h5py.__version__); print(numpy.__version__)'],text=True,capture_output=True)
