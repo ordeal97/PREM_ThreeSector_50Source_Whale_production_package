@@ -25,10 +25,18 @@ python scripts/production_cli.py build-template \
 
 第二条命令才会下载 config 中固定 commit 的源码，重新 configure 并编译 `meshfem3D`；不执行 mesher、solver 或 bsub。不复制旧二进制、Makefile 或 mesher header；公共 DATA 来自 `specfem_template`。
 
-自动读取 `config.status` 的 configure 参数，并核对 Makefile 中可识别的编译变量；只从旧目录顶层 `.sh`/`.lsf` 读取简单 module 命令，不执行旧脚本。复杂模块初始化、手工 Makefile 修改、无法恢复的参数需要人工处理。旧构建未启用 ASDF 时，仅在有 ASDF_LIBS 证据时补加 `--with-asdf`，否则拒绝构建。不会安装依赖或自动换编译器。请在与旧构建相同的 Whale 环境中执行，并检查继承报告中的 module 顺序和依赖路径。
+自动读取 `config.status` 的 configure 参数，并核对 Makefile 中可识别的编译变量；只从旧目录顶层 `.sh`/`.lsf` 读取简单 module 命令，不执行旧脚本。复杂模块初始化、手工 Makefile 修改、无法恢复的参数需要人工处理。旧构建未启用 ASDF 时，仅在有 ASDF_LIBS 证据时补加 `--with-asdf`，否则拒绝构建。归档成功 Aplus Makefile 唯一有证据的手工差异是 `FLAGS_CHECK` 中 `-fpe0` 改为 `-fpe3`；build-template 会在重新 configure 后只重放此差异，并将其写入 build manifest。不会安装依赖或自动换编译器。请在与旧构建相同的 Whale 环境中执行，并检查继承报告中的 module 顺序和依赖路径。
 
 每次在 `.production_runtime/builds/inherit-*` 新目录留下 `BUILD_INHERITANCE.md`、`build_manifest.json` 和构建日志；不覆盖旧构建，也不改变冻结输入。`--inspect-only` 通过只代表配置可解析，不代表依赖可用。真实编译和链接必须在 Whale 验证。solver 仍须在各 run 独立工作树中、mesher 产生新 header 后编译；报告中的 solver_recipe 仅记录此后步骤，不能提前共享 solver。
 
-`submit` 在 Whale 上通过一个静态 control LSF 作业启动唯一的生产 controller；它只在 preflight 未过期、已 materialize、worktree 与冻结 DATA/LSF 一致且 `bsub` 可用时执行。`mock-submission` 是内存状态机测试：验证 100 个 run、并发上限 2 和 B0→TRIULVZ barrier，但不替代 Whale 的真实 LSF/mesher/solver 验证。
+build-template 后必须运行最小 ASDF/HDF5 probe：
+
+```bash
+python scripts/production_cli.py asdf-smoke --source-dir .production_runtime/builds/<inherit>/source/specfem3d_globe
+```
+
+它用该 Makefile 的实际 `FCLINK`、`MPILIBS`、`FLAGS_CHECK` 编译小型 Fortran 程序，并调用 `ASDF_initialize_hdf5_f`、串行创建/关闭 HDF5 文件和 `ASDF_finalize_hdf5_f`。报告写入 `.production_runtime/asdf_smoke/summary.json`。`submit` 与 `resume` 只接受同一 config hash、固定 source commit 的 PASS 报告；每个 control job 在提交 mesher 前还会使用该 run 的 Makefile 重跑 probe，并在 solver build 后检查 `xspecfem3D` 的 `libasdf`/HDF5 linkage。详见 [运行链审计](provenance/aplus_runtime_chain_audit.md)。
+
+`submit` 在 Whale 上通过一个静态 control LSF 作业启动唯一的生产 controller；它只在 preflight 未过期、ASDF smoke PASS、已 materialize、worktree 与冻结 DATA/LSF 一致且 `bsub` 可用时执行。`mock-submission` 是内存状态机测试：验证 100 个 run、并发上限 2 和 B0→TRIULVZ barrier，但不替代 Whale 的真实 LSF/mesher/solver 验证。
 
 Whale 依赖已冻结为 A+ 运行 profile：oneAPI 2023.1.0、`hdf5/1.14.3_oneapi2023`、`mpirun` 和 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`。环境初始化先检查 `ifort`、`mpiifort`、`mpirun`；只有缺失时才以 `setvars.sh --force` 补全，因此继承的 oneAPI 环境不会重复初始化失败。运行 `deployment-check` 验证实际节点环境后，才允许 build/materialize/submit。

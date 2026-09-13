@@ -14,7 +14,7 @@ from production_common import environment_setup
 
 VARIABLES = {'FC', 'CC', 'CXX', 'MPIFC', 'MPICC', 'FCFLAGS', 'CFLAGS',
              'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'LIBS', 'ASDF_LIBS',
-             'HDF5_LIBS', 'HDF5_INC', 'HDF5_FCFLAGS'}
+             'HDF5_LIBS', 'HDF5_INC', 'HDF5_FCFLAGS', 'FLAGS_CHECK'}
 SOURCE_COMMIT = '72f0c39117df9395c12fa901a9ae99fa3e7bdfd9'
 SOURCE_REPOSITORY = 'git@github.com:ordeal97/ulvz_specfem.git'
 
@@ -30,6 +30,17 @@ def _make_assignments(text):
         text, re.M)}
 
 
+def _config_substitutions(status):
+    """Read config.status substitutions, including its backslash continuations."""
+    status = re.sub(r'"[ \t]*\\\r?\n"', '', status)
+    return dict(re.findall(r'^S\["(\w+)"\]="([^"\n]*)"$', status, re.M))
+
+
+def _aplus_fpe3_override(configured, actual):
+    """The archived successful A+ Makefile changes only Intel's FPE mode."""
+    return configured.count('-fpe0') == 1 and actual == configured.replace('-fpe0', '-fpe3')
+
+
 def _makefile_differences(makefile, substitutions):
     assignments = _make_assignments(makefile)
     expected, blocking = [], []
@@ -42,6 +53,8 @@ def _makefile_differences(makefile, substitutions):
             reason = 'SPECFEM Makefile.in prepends -I${SETUP}'
         elif key == 'MPICC' and actual == '$(CC)' and assignments.get('ADIOS2') == 'no' and assignments.get('CC') == substitutions.get('CC'):
             reason = 'SPECFEM Makefile.in derives MPICC=$(CC) when ADIOS2=no'
+        elif key == 'FLAGS_CHECK' and _aplus_fpe3_override(configured, actual):
+            reason = 'validated A+ Makefile changes Intel FPE mode -fpe0 to -fpe3 for ASDF/HDF5 output'
         item = {'variable': key, 'configured': configured, 'makefile': actual}
         if reason:
             item['reason'] = reason
@@ -74,7 +87,7 @@ def inspect_reference(reference):
             options.append(arg)
         else:
             errors.append('Unsupported configure argument: ' + arg)
-    substitutions = dict(re.findall(r'^S\["(\w+)"\]="([^"\n]*)"$', status, re.M))
+    substitutions = _config_substitutions(status)
     for key in VARIABLES:
         if key not in variables and substitutions.get(key):
             variables[key] = substitutions[key]
@@ -125,11 +138,39 @@ def inspect_reference(reference):
             added.append('--with-asdf')
         else:
             errors.append('ASDF is not enabled and no ASDF_LIBS evidence exists; provide an ASDF-enabled reference build')
+    overrides = {item['variable']: item['makefile'] for item in expected_differences
+                 if item['variable'] == 'FLAGS_CHECK' and 'FPE mode' in item.get('reason', '')}
     return {'reference': str(reference), 'options': options, 'variables': variables,
             'module_commands': modules, 'evidence_hashes': evidence,
             'makefile_differences': differences,
             'expected_makefile_differences': expected_differences,
+            'required_makefile_overrides': overrides,
             'added_options': added, 'errors': errors}
+
+
+def _apply_makefile_overrides(path, overrides):
+    """Apply only audited full-line Makefile overrides after configure."""
+    text = path.read_text()
+    for key, value in overrides.items():
+        pattern = rf'^{re.escape(key)}[ \t]*=[^\r\n]*$'
+        text, count = re.subn(pattern, f'{key} = {value}', text, flags=re.M)
+        if count != 1:
+            raise RuntimeError(f'cannot safely apply audited Makefile override: {key}')
+    path.write_text(text)
+
+
+def _effective_makefile_settings(path):
+    assignments = _make_assignments(path.read_text())
+    return {key: assignments.get(key, '') for key in
+            ('FC', 'CC', 'MPIFC', 'MPICC', 'FLAGS_CHECK', 'FCFLAGS', 'FCLINK', 'MPILIBS', 'LDFLAGS', 'LIBS', 'ASDF')}
+
+
+def _ldd(binary, environment):
+    setup = environment_setup(environment)
+    result = subprocess.run(['bash', '-lc', 'set -e\n' + setup + '\nldd "$1"', 'build-linkage-audit', str(binary)],
+                            text=True, capture_output=True, check=False)
+    return {'returncode': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr,
+            'has_not_found': 'not found' in result.stdout + result.stderr}
 
 
 def _source_root(path):
@@ -250,12 +291,19 @@ def run_build(root, reference, inspect_only=False, jobs=1, source_tree=None):
         configured = (source / 'Makefile').read_text()
         if not re.search(r'^ASDF\s*=\s*yes\s*$', configured, re.M):
             raise RuntimeError('Configured build does not enable ASDF')
+        _apply_makefile_overrides(source / 'Makefile', recipe['required_makefile_overrides'])
+        recipe['effective_makefile_settings'] = _effective_makefile_settings(source / 'Makefile')
+        if recipe['required_makefile_overrides'].get('FLAGS_CHECK') and '-fpe3' not in recipe['effective_makefile_settings']['FLAGS_CHECK']:
+            raise RuntimeError('validated A+ -fpe3 Makefile override did not take effect')
         execute(['make', '-j', str(jobs), 'meshfem3D'], source, True)
         binary = source / 'bin/xmeshfem3D'
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise RuntimeError('Build did not produce executable xmeshfem3D')
         recipe['mesher'] = str(binary)
         recipe['mesher_hash'] = sha(binary)
+        recipe['mesher_ldd'] = _ldd(binary, recipe['canonical_environment'])
+        if recipe['mesher_ldd']['has_not_found']:
+            raise RuntimeError('xmeshfem3D linkage has unresolved shared libraries')
         recipe['solver_recipe'] = {'cwd': str(source), 'argv': ['make', '-j', str(jobs), 'specfem3D'],
                                    'requires': 'Isolated per-run tree with fresh values_from_mesher.h; never share across active runs'}
         recipe['status'] = 'BUILT_MESHER_ONLY'

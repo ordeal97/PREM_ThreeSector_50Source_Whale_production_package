@@ -56,6 +56,18 @@ class BuildTests(unittest.TestCase):
         self.assertTrue(result['makefile_differences'])
         self.assertIn('Makefile differs', ' '.join(result['errors']))
 
+    def test_validated_aplus_fpe3_override_is_preserved(self):
+        _, old = self.fixture()
+        (old / 'config.status').write_text(
+            'ac_cs_config=\'FC=ifort CC=icc MPIFC=mpiifort MPICC=mpiicc --with-asdf\'\n'
+            'S["FC"]="ifort"\nS["CC"]="icc"\nS["MPIFC"]="mpiifort"\nS["MPICC"]="mpiicc"\n'
+            'S["FLAGS_CHECK"]="-xHost -fpe0 "\\\n"-O3"\n')
+        (old / 'Makefile').write_text(
+            'FC = ifort\nCC = icc\nMPIFC = mpiifort\nMPICC = mpiicc\nFLAGS_CHECK = -xHost -fpe3 -O3\n')
+        result = inspect_reference(old)
+        self.assertEqual(result['makefile_differences'], [])
+        self.assertEqual(result['required_makefile_overrides'], {'FLAGS_CHECK': '-xHost -fpe3 -O3'})
+
     def test_offline_archive_requires_and_checks_provenance(self):
         root = Path(tempfile.mkdtemp(prefix='offline-source-test-'))
         source = root / 'ulvz_specfem'
@@ -90,7 +102,7 @@ class BuildTests(unittest.TestCase):
             (data / name).write_text('canonical')
         calls = []
 
-        def fake_run(argv, cwd, **kwargs):
+        def fake_run(argv, cwd=None, **kwargs):
             calls.append(argv)
             if argv[:2] == ['git', 'clone']:
                 source = Path(argv[-1]) / 'specfem3d_globe'
@@ -101,11 +113,15 @@ class BuildTests(unittest.TestCase):
                 binary = source / 'bin/xmeshfem3D'
                 binary.write_text('mock binary')
                 binary.chmod(0o755)
+            if argv[0] == 'bash':
+                return type('Result', (), {'returncode': 0, 'stdout': '', 'stderr': ''})()
 
         with patch('build_template.subprocess.run', side_effect=fake_run), patch('build_template.subprocess.check_output', return_value=SOURCE_COMMIT + '\n'):
             output = run_build(root, old)
-        self.assertEqual(len(calls), 4)
-        self.assertEqual(calls[-1][-4:], ['make', '-j', '1', 'meshfem3D'])
+        self.assertEqual(len(calls), 5)
+        self.assertEqual(calls[-2][-4:], ['make', '-j', '1', 'meshfem3D'])
+        self.assertEqual(calls[-1][0], 'bash')
+        self.assertIn('ldd "$1"', calls[-1][2])
         self.assertNotIn('bsub', str(calls))
         self.assertNotIn('./bin/xmeshfem3D', str(calls))
         self.assertIn('BUILT_MESHER_ONLY', (output / 'build_manifest.json').read_text())
