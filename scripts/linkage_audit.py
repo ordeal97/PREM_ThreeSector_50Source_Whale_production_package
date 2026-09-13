@@ -4,9 +4,27 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+ASDF_INITIALIZE_SYMBOL = re.compile(r"\basdf_initialize_hdf5_f_*\b", re.IGNORECASE)
+
+
+def symbol_check(binary: Path) -> tuple[bool, list[dict]]:
+    """Find the production ASDF initialization symbol without assuming libasdf is shared."""
+    checks = []
+    for command in (("nm", "-a", str(binary)), ("readelf", "-Ws", str(binary))):
+        result = subprocess.run(command, text=True, capture_output=True, check=False)
+        payload = result.stdout + result.stderr
+        checks.append({"command": list(command), "returncode": result.returncode,
+                       "found_asdf_initialize_hdf5_f": bool(ASDF_INITIALIZE_SYMBOL.search(payload)),
+                       "stdout": result.stdout, "stderr": result.stderr})
+        if result.returncode == 0 and ASDF_INITIALIZE_SYMBOL.search(payload):
+            return True, checks
+    return False, checks
 
 
 def inspect(binary: Path, require_asdf: bool) -> dict:
@@ -18,14 +36,17 @@ def inspect(binary: Path, require_asdf: bool) -> dict:
         errors.append(f"ldd exited {result.returncode}")
     if "not found" in payload:
         errors.append("ldd reports an unresolved shared library")
+    symbol_checks = []
     if require_asdf:
-        if "libasdf" not in payload:
-            errors.append("xspecfem3D does not resolve libasdf")
-        if "libhdf5" not in payload:
+        if "libhdf5" not in payload.lower():
             errors.append("xspecfem3D does not resolve an HDF5 library")
+        asdf_symbol_found, symbol_checks = symbol_check(binary)
+        if not asdf_symbol_found:
+            errors.append("xspecfem3D lacks ASDF initialization symbol asdf_initialize_hdf5_f")
     return {"status": "PASS" if not errors else "FAIL", "timestamp": datetime.now(timezone.utc).isoformat(),
             "binary": str(binary), "require_asdf": require_asdf, "errors": errors,
-            "ldd_returncode": result.returncode, "ldd_stdout": result.stdout, "ldd_stderr": result.stderr}
+            "ldd_returncode": result.returncode, "ldd_stdout": result.stdout, "ldd_stderr": result.stderr,
+            "asdf_symbol_checks": symbol_checks}
 
 
 def main() -> None:

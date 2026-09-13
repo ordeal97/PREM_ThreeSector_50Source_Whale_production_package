@@ -75,12 +75,27 @@ class AsdfSmokeTests(unittest.TestCase):
         self.assertFalse((source / 'asdf_hdf5_smoke').exists())
         self.assertFalse((source / 'asdf_smoke.h5').exists())
 
-    def test_linkage_requires_asdf_and_hdf5(self):
+    def test_linkage_accepts_static_asdf_like_successful_aplus_binary(self):
         binary = Path(tempfile.mkdtemp()) / 'xspecfem3D'
         binary.write_text('mock')
-        with patch('linkage_audit.subprocess.run', return_value=type('Result', (), {'returncode': 0, 'stdout': 'libasdf.so\nlibhdf5.so\n', 'stderr': ''})()):
-            self.assertEqual(linkage_audit.inspect(binary, True)['status'], 'PASS')
-        with patch('linkage_audit.subprocess.run', return_value=type('Result', (), {'returncode': 0, 'stdout': 'libmpi.so\n', 'stderr': ''})()):
+        results = [
+            type('Result', (), {'returncode': 0, 'stdout': 'libhdf5.so\nlibmpi.so\n', 'stderr': ''})(),
+            type('Result', (), {'returncode': 0, 'stdout': '00000000 T asdf_initialize_hdf5_f_\n', 'stderr': ''})(),
+        ]
+        with patch('linkage_audit.subprocess.run', side_effect=results):
+            report = linkage_audit.inspect(binary, True)
+        self.assertEqual(report['status'], 'PASS')
+        self.assertTrue(report['asdf_symbol_checks'][0]['found_asdf_initialize_hdf5_f'])
+
+    def test_linkage_rejects_missing_hdf5_or_asdf_symbol(self):
+        binary = Path(tempfile.mkdtemp()) / 'xspecfem3D'
+        binary.write_text('mock')
+        results = [
+            type('Result', (), {'returncode': 0, 'stdout': 'libmpi.so\n', 'stderr': ''})(),
+            type('Result', (), {'returncode': 0, 'stdout': 'no matching symbol\n', 'stderr': ''})(),
+            type('Result', (), {'returncode': 0, 'stdout': 'no matching symbol\n', 'stderr': ''})(),
+        ]
+        with patch('linkage_audit.subprocess.run', side_effect=results):
             self.assertEqual(linkage_audit.inspect(binary, True)['status'], 'FAIL')
 
     def test_submit_gate_requires_fresh_smoke_for_pinned_commit(self):

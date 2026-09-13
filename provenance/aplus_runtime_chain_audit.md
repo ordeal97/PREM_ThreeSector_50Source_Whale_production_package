@@ -9,7 +9,7 @@
 | 编译器 | `ifort` / `icc` / `mpiifort` / `mpiicc` | 由 reference `config.status` 继承并在 Makefile 中审计 |
 | oneAPI | `oneapi_2023.1.0/setvars.sh` | 幂等初始化后检查 `ifort`、`mpiifort`、`mpirun` |
 | HDF5 | module `hdf5/1.14.3_oneapi2023`；ASDF 链接 `/share/apps/hdf5/1.14.3_oneapi2023.1/lib` | 同一 module；实际 `ldd` 必须没有 unresolved library |
-| ASDF | `--with-asdf`，`libasdf` + HDF5 Fortran/high-level libraries | build 和 `xspecfem3D` linkage audit 必须确认 |
+| ASDF | `--with-asdf`，`libasdf` + HDF5 Fortran/high-level libraries | `ldd` 必须解析 HDF5 且无缺库；`libasdf` 可静态链接，因此以 `asdf_initialize_hdf5_f` 符号确认 ASDF |
 | 浮点异常 | `config.status` 是 `-fpe0`，但归档成功 `Makefile` 的唯一手工差异为 `-fpe3` | configure 后只重放此已验证 override |
 | 输出证据 | Aplus `SRC01_B0` 完整完成，ASDF 有 510 traces × 25400 samples | PREM 保持 ASDF runtime QC 的 1530 traces、510 stations、25400 samples |
 

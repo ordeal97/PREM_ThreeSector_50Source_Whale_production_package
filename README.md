@@ -35,7 +35,7 @@ build-template 后必须运行最小 ASDF/HDF5 probe：
 python scripts/production_cli.py asdf-smoke --source-dir .production_runtime/builds/<inherit>/source/specfem3d_globe
 ```
 
-它用该 Makefile 的实际 `FCLINK`、`MPILIBS`、`FLAGS_CHECK` 编译小型 Fortran 程序，并调用 `ASDF_initialize_hdf5_f`、串行创建/关闭 HDF5 文件和 `ASDF_finalize_hdf5_f`。报告写入 `.production_runtime/asdf_smoke/summary.json`。`submit` 与 `resume` 只接受同一 config hash、固定 source commit 的 PASS 报告；每个 control job 在提交 mesher 前还会使用该 run 的 Makefile 重跑 probe，并在 solver build 后检查 `xspecfem3D` 的 `libasdf`/HDF5 linkage。详见 [运行链审计](provenance/aplus_runtime_chain_audit.md)。
+它用该 Makefile 的实际 `FCLINK`、`MPILIBS`、`FLAGS_CHECK` 编译小型 Fortran 程序，并调用 `ASDF_initialize_hdf5_f`、串行创建/关闭 HDF5 文件和 `ASDF_finalize_hdf5_f`。报告写入 `.production_runtime/asdf_smoke/summary.json`。`submit` 与 `resume` 只接受同一 config hash、固定 source commit 的 PASS 报告；每个 control job 在提交 mesher 前还会使用该 run 的 Makefile 重跑 probe，并在 solver build 后检查 `xspecfem3D` 的 HDF5 动态链接和 ASDF 初始化符号。详见 [运行链审计](provenance/aplus_runtime_chain_audit.md)。
 
 已有的 inactive worktree 仍带旧 Makefile 时，先运行 `python scripts/production_cli.py status` 初始化/读取状态表，再执行 `python scripts/production_cli.py materialize --rebuild-inactive`。它只接受 `NOT_SUBMITTED` 或 scratch 已清理的 `EXIT/QC_FAIL`，将旧 tree 保留到 `.production_runtime/superseded_worktrees/` 后再生成新 tree；活动、DONE 和未清理 scratch 的 run 会被拒绝。
 
