@@ -42,8 +42,38 @@ class AsdfSmokeTests(unittest.TestCase):
             report = asdf_smoke.run(source, root / 'out', 'config-hash')
         self.assertEqual(report['status'], 'PASS')
         self.assertEqual(report['config_hash'], 'config-hash')
-        self.assertEqual(calls[0][:3], ['make', '-f', 'Makefile'])
+        self.assertEqual(calls[0][:3], ['make', '-C', str(source)])
+        self.assertEqual(calls[0][3:], ['-f', str(root / 'out' / 'Makefile')])
         self.assertEqual(calls[1][0], str(root / 'out' / 'asdf_hdf5_smoke'))
+
+    def test_make_runs_from_source_tree_for_relative_specfem_includes(self):
+        root = Path(tempfile.mkdtemp())
+        source = root / 'source'
+        rules = source / 'src' / 'gindex3D' / 'rules.mk'
+        rules.parent.mkdir(parents=True)
+        rules.write_text('relative_rules_loaded:\n\t@:\n')
+        linker = root / 'fake_linker.sh'
+        linker.write_text(
+            '#!/usr/bin/env bash\nset -eu\n'
+            'while [[ $# -gt 0 ]]; do\n'
+            '  if [[ "$1" == "-o" ]]; then output="$2"; shift 2; else shift; fi\n'
+            'done\n'
+            "printf '%s\\n' '#!/usr/bin/env bash' 'printf hdf5 > asdf_smoke.h5' > \"$output\"\n"
+            'chmod +x "$output"\n')
+        linker.chmod(0o755)
+        (source / 'Makefile').write_text(
+            'ASDF = yes\nMPIFC = mpiifort\n'
+            f'FCLINK = {linker}\nFLAGS_CHECK = -fpe3\n'
+            'MPILIBS =\nLDFLAGS =\nLIBS =\n'
+            'include src/gindex3D/rules.mk\n')
+
+        report = asdf_smoke.run(source, root / 'out')
+
+        self.assertEqual(report['status'], 'PASS')
+        self.assertTrue((root / 'out' / 'asdf_hdf5_smoke').is_file())
+        self.assertGreater((root / 'out' / 'asdf_smoke.h5').stat().st_size, 0)
+        self.assertFalse((source / 'asdf_hdf5_smoke').exists())
+        self.assertFalse((source / 'asdf_smoke.h5').exists())
 
     def test_linkage_requires_asdf_and_hdf5(self):
         binary = Path(tempfile.mkdtemp()) / 'xspecfem3D'

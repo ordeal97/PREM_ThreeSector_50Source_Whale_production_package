@@ -61,11 +61,11 @@ end program asdf_hdf5_smoke
 """
 
 
-def smoke_makefile(source: Path) -> str:
+def smoke_makefile(output: Path) -> str:
     return f""".DEFAULT_GOAL := smoke
-include {source / 'Makefile'}
-smoke: asdf_hdf5_smoke.f90
-\t$(FCLINK) -o asdf_hdf5_smoke $< $(LDFLAGS) $(MPILIBS) $(LIBS)
+include Makefile
+smoke: {output / 'asdf_hdf5_smoke.f90'}
+\t$(FCLINK) -o {output / 'asdf_hdf5_smoke'} $< $(LDFLAGS) $(MPILIBS) $(LIBS)
 """
 
 
@@ -90,11 +90,16 @@ def run(source: Path, output: Path, config_hash: str = "") -> dict:
               "calls_production_serial_asdf_path": ["ASDF_initialize_hdf5_f", "ASDF_create_new_file_serial_f", "ASDF_close_file_f", "ASDF_finalize_hdf5_f"],
               "errors": errors, "status": "FAIL" if errors else "PENDING"}
     (output / "asdf_hdf5_smoke.f90").write_text(smoke_source())
-    (output / "Makefile").write_text(smoke_makefile(source))
+    (output / "Makefile").write_text(smoke_makefile(output))
     if errors:
         (output / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
         return report
-    compile_result = subprocess.run(["make", "-f", "Makefile"], cwd=output, text=True, capture_output=True)
+    # SPECFEM's Makefile includes src/*/rules.mk relative to its source root.
+    # Run make from that root while keeping this smoke-only Makefile and every
+    # generated source, binary, log, and HDF5 output under ``output``.
+    compile_result = subprocess.run(
+        ["make", "-C", str(source), "-f", str(output / "Makefile")],
+        cwd=output, text=True, capture_output=True)
     report["compile_returncode"] = compile_result.returncode
     (output / "compile.log").write_text(compile_result.stdout + compile_result.stderr)
     if compile_result.returncode:
