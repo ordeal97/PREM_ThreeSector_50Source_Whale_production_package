@@ -14,6 +14,7 @@ python3 scripts/production_cli.py build-template --reference-build /path/to/old/
 python3 scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --jobs 1
 python3 scripts/production_cli.py asdf-smoke --source-dir .production_runtime/builds/<inherit>/source/specfem3d_globe
 python3 scripts/production_cli.py render
+python3 scripts/production_cli.py status
 python3 scripts/production_cli.py materialize --rebuild-inactive
 python3 scripts/production_cli.py deployment-check
 python3 scripts/production_cli.py dry-run
