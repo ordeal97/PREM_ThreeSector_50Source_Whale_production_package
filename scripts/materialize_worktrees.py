@@ -2,6 +2,7 @@
 """Create isolated run trees from a verified build-template source snapshot."""
 from __future__ import annotations
 import argparse,json,shlex,shutil,tomllib
+from datetime import datetime,timezone
 from pathlib import Path
 from production_common import environment_setup as shared_environment_setup,load_config,rows,runtime
 
@@ -9,6 +10,9 @@ IGNORE=shutil.ignore_patterns('.git','obj','bin','DATABASES_MPI','OUTPUT_FILES',
 RUNTIME_DIRS=('obj','bin','OUTPUT_FILES','logs')
 def ensure_runtime_dirs(target):
  for name in RUNTIME_DIRS:(target/name).mkdir(parents=True,exist_ok=True)
+def may_replace_inactive(status):
+ state=status.get('state','')
+ return state=='NOT_SUBMITTED' or (state in {'EXIT','QC_FAIL'} and status.get('scratch_cleaned')=='true')
 def latest_build(cfg):
  builds=cfg['paths']['runtime_root']/'builds';candidates=[]
  for manifest in builds.glob('*/build_manifest.json') if builds.is_dir() else ():
@@ -81,7 +85,8 @@ submit_child solver solver_lsf.bash
 ''')
  for path in (run/'mesher_lsf.bash',run/'solver_lsf.bash',run/'submit_lsf.bash'):path.chmod(0o755)
 def main():
- p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--source',type=Path);p.add_argument('--dry-run',action='store_true');p.add_argument('--refresh-lsf',action='store_true');p.add_argument('--run-id',action='append');a=p.parse_args();cfg=load_config(a.config)
+ p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--source',type=Path);p.add_argument('--dry-run',action='store_true');p.add_argument('--refresh-lsf',action='store_true');p.add_argument('--rebuild-inactive',action='store_true');p.add_argument('--run-id',action='append');a=p.parse_args();cfg=load_config(a.config)
+ if a.refresh_lsf and a.rebuild_inactive:raise SystemExit('--refresh-lsf and --rebuild-inactive are mutually exclusive')
  source=None;modules=default_modules(cfg)
  if not a.refresh_lsf:
   if a.source:source=a.source.resolve()
@@ -97,17 +102,23 @@ def main():
   target=cfg['paths']['run_root']/row['run_id']
   if a.refresh_lsf and not target.exists():raise SystemExit('cannot refresh missing worktree '+row['run_id'])
   if target.exists():
-   if not (target/'DATA/Par_file').is_file():raise SystemExit('refusing non-worktree path '+str(target))
-   ensure_runtime_dirs(target)
-   if a.refresh_lsf:
-    if status.get(row['run_id'],{}).get('state') in {'CONTROL_PEND','CONTROL_RUN','MESHER','SOLVER','QC','CLEANUP_PENDING'}:raise SystemExit('refusing LSF refresh while run is active: '+row['run_id'])
-    if not a.dry_run:lsf(cfg,row,target,modules or default_modules(cfg))
-   continue
+    if not (target/'DATA/Par_file').is_file():raise SystemExit('refusing non-worktree path '+str(target))
+    ensure_runtime_dirs(target)
+    if a.refresh_lsf:
+     if status.get(row['run_id'],{}).get('state') in {'CONTROL_PEND','CONTROL_RUN','MESHER','SOLVER','QC','CLEANUP_PENDING'}:raise SystemExit('refusing LSF refresh while run is active: '+row['run_id'])
+     if not a.dry_run:lsf(cfg,row,target,modules or default_modules(cfg))
+     continue
+    if not a.rebuild_inactive:continue
+    prior=status.get(row['run_id'],{})
+    if not may_replace_inactive(prior):raise SystemExit('rebuild-inactive requires NOT_SUBMITTED or terminal failed run with cleaned scratch: '+row['run_id'])
+    if not a.dry_run:
+     archive=cfg['paths']['runtime_root']/'superseded_worktrees'/(row['run_id']+'.'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+     archive.parent.mkdir(parents=True,exist_ok=True);shutil.move(str(target),str(archive))
   created.append(row['run_id'])
   if a.dry_run:continue
   shutil.copytree(source,target,ignore=IGNORE);shutil.copytree(cfg['paths']['inputs_dir']/row['run_id']/'DATA',target/'DATA',dirs_exist_ok=True)
   ensure_runtime_dirs(target);lsf(cfg,row,target,modules or default_modules(cfg))
   (target/'run_identity.json').write_text(json.dumps({'run_id':row['run_id'],'source_commit':cfg['source']['commit'],'input_hashes':{k:row[k] for k in ('par_file_sha256','cmtsolution_sha256','stations_sha256','ulvz_file_sha256')}},indent=2)+'\n')
  if selected and selected-{x['run_id'] for x in rows(cfg['paths']['manifest'])}:raise SystemExit('unknown run_id in --run-id')
- print(json.dumps({'source':str(source) if source else None,'created':created,'count':len(created),'dry_run':a.dry_run,'refresh_lsf':a.refresh_lsf},indent=2))
+ print(json.dumps({'source':str(source) if source else None,'created':created,'count':len(created),'dry_run':a.dry_run,'refresh_lsf':a.refresh_lsf,'rebuild_inactive':a.rebuild_inactive},indent=2))
 if __name__=='__main__':main()

@@ -43,6 +43,7 @@ def main():
  for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup','asdf-smoke'):s.add_parser(name)
  b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--source-tree',type=Path,help='离线本地 ulvz_specfem 源码树');b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
  s.choices['asdf-smoke'].add_argument('--source-dir',type=Path,required=True)
+ s.choices['materialize'].add_argument('--rebuild-inactive',action='store_true')
  for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
  s.choices['cleanup'].add_argument('--execute',action='store_true')
  a=p.parse_args();cfg=load_config(a.config)
@@ -67,7 +68,9 @@ def main():
  if a.cmd=='render':
   subprocess.run([sys.executable,str(ROOT/'scripts/render_lsf.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='materialize':
-  gate();subprocess.run([sys.executable,str(ROOT/'scripts/materialize_worktrees.py'),'--config',str(a.config)],check=True);return
+  gate();command=[sys.executable,str(ROOT/'scripts/materialize_worktrees.py'),'--config',str(a.config)]
+  if a.rebuild_inactive:command.append('--rebuild-inactive')
+  subprocess.run(command,check=True);return
  if a.cmd=='status':
   subprocess.run([sys.executable,str(ROOT/'scripts/production_controller.py'),'--config',str(a.config),'--action','status'],check=True);return
  if a.cmd=='cleanup':

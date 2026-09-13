@@ -2,7 +2,7 @@ import tempfile,sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from materialize_worktrees import ensure_runtime_dirs,main as materialize_main
+from materialize_worktrees import ensure_runtime_dirs,main as materialize_main,may_replace_inactive
 from production_common import worktree_errors
 from production_cli import control_lsf,materialized_gate
 from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, scheduler, stage2_ready, submission_blocked, submit
@@ -19,6 +19,11 @@ class ControllerLogic(unittest.TestCase):
   target=Path(tempfile.mkdtemp())/'run'
   ensure_runtime_dirs(target);ensure_runtime_dirs(target)
   self.assertTrue(all((target/name).is_dir() for name in ('obj','bin','OUTPUT_FILES','logs')))
+ def test_rebuild_inactive_refuses_active_or_unclean_failed_runs(self):
+  self.assertTrue(may_replace_inactive({'state':'NOT_SUBMITTED'}))
+  self.assertTrue(may_replace_inactive({'state':'EXIT','scratch_cleaned':'true'}))
+  self.assertFalse(may_replace_inactive({'state':'EXIT','scratch_cleaned':'false'}))
+  self.assertFalse(may_replace_inactive({'state':'SOLVER','scratch_cleaned':'true'}))
  def test_control_lsf_creates_runtime_logs(self):
   root=Path(tempfile.mkdtemp())
   cfg={'lsf':{'control_job_prefix':'p','control_queue':'serial','control_ranks':1,'control_hosts':1},'runtime':{'python_bin':'python3'},'_root':root,'_path':root/'config.toml','paths':{'runtime_root':root/'runtime'}}
