@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -97,6 +98,26 @@ class AsdfSmokeTests(unittest.TestCase):
         ]
         with patch('linkage_audit.subprocess.run', side_effect=results):
             self.assertEqual(linkage_audit.inspect(binary, True)['status'], 'FAIL')
+
+    def test_linkage_uses_frozen_runtime_environment_not_caller_library_path(self):
+        binary = Path(tempfile.mkdtemp()) / 'xspecfem3D'
+        binary.write_text('mock')
+        results = [
+            type('Result', (), {'returncode': 0, 'stdout': 'libhdf5.so.310\n', 'stderr': ''})(),
+            type('Result', (), {'returncode': 0, 'stdout': 'T asdf_initialize_hdf5_f_\n', 'stderr': ''})(),
+        ]
+        calls = []
+        def fake_run(*args, **kwargs):
+            calls.append(args[0])
+            return results.pop(0)
+        with patch.dict(os.environ, {'LD_LIBRARY_PATH': ''}, clear=False), \
+             patch('linkage_audit.subprocess.run', side_effect=fake_run):
+            report = linkage_audit.inspect(binary, True)
+        self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(calls[0][:2], ['bash', '-lc'])
+        self.assertIn('module purge', calls[0][2])
+        self.assertIn('module load hdf5/1.14.3_oneapi2023', calls[0][2])
+        self.assertIn('exec ldd ', calls[0][2])
 
     def test_submit_gate_requires_fresh_smoke_for_pinned_commit(self):
         root = Path(tempfile.mkdtemp())

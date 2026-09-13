@@ -40,9 +40,12 @@ exec {cfg['runtime']['python_bin']} {ROOT}/scripts/production_controller.py --co
 ''');return target
 def main():
  p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=ROOT/'config/production.toml');s=p.add_subparsers(dest='cmd',required=True)
- for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup','asdf-smoke'):s.add_parser(name)
+ for name in ('validate','preflight','dry-run','deployment-check','mock-submission','render','materialize','status','resume','submit','cleanup','asdf-smoke','linkage-audit'):s.add_parser(name)
  b=s.add_parser('build-template');b.add_argument('--reference-build',type=Path,required=True);b.add_argument('--source-tree',type=Path,help='离线本地 ulvz_specfem 源码树');b.add_argument('--inspect-only',action='store_true');b.add_argument('--jobs',type=int,default=1)
  s.choices['asdf-smoke'].add_argument('--source-dir',type=Path,required=True)
+ s.choices['linkage-audit'].add_argument('--binary',type=Path,required=True)
+ s.choices['linkage-audit'].add_argument('--require-asdf',action='store_true')
+ s.choices['linkage-audit'].add_argument('--output',type=Path)
  s.choices['materialize'].add_argument('--rebuild-inactive',action='store_true')
  for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
  s.choices['cleanup'].add_argument('--execute',action='store_true')
@@ -65,6 +68,12 @@ def main():
   (target/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
   if result.returncode:raise RuntimeError('ASDF/HDF5 smoke failed; see '+str(run_dir/'summary.json'))
   return
+ if a.cmd=='linkage-audit':
+  from linkage_audit import inspect
+  report=inspect(a.binary,a.require_asdf,cfg);encoded=json.dumps(report,indent=2)+'\n'
+  if a.output:
+   a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(encoded)
+  print(encoded,end='');raise SystemExit(report['status']!='PASS')
  if a.cmd=='render':
   subprocess.run([sys.executable,str(ROOT/'scripts/render_lsf.py'),'--config',str(a.config)],check=True);return
  if a.cmd=='materialize':
