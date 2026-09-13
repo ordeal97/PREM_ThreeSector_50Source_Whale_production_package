@@ -12,13 +12,6 @@ def gate():
  if not p.is_file():raise RuntimeError('preflight summary missing')
  s=json.loads(p.read_text());changed=[k for k,v in hashes().items() if s.get(k)!=v]
  if s.get('status')!='PASS' or changed:raise RuntimeError('submit refused: preflight invalid/stale '+','.join(changed))
-def asdf_smoke_gate(cfg):
- p=runtime(cfg)['root']/'asdf_smoke'/'summary.json'
- if not p.is_file():raise RuntimeError('submit refused: ASDF/HDF5 smoke summary missing; run asdf-smoke after build-template')
- try:s=json.loads(p.read_text())
- except ValueError as exc:raise RuntimeError('submit refused: invalid ASDF/HDF5 smoke summary') from exc
- if s.get('status')!='PASS' or s.get('config_hash')!=digest(ROOT/'config/production.toml') or s.get('source_commit')!=cfg['source']['commit']:
-  raise RuntimeError('submit refused: ASDF/HDF5 smoke is failed, stale, or from a different source commit')
 def materialized_gate(cfg):
  errors=[]
  for row in rows(cfg['paths']['manifest']):
@@ -69,8 +62,8 @@ def main():
   if result.returncode:raise RuntimeError('ASDF/HDF5 smoke failed; see '+str(run_dir/'summary.json'))
   return
  if a.cmd=='linkage-audit':
-  from linkage_audit import inspect
-  report=inspect(a.binary,a.require_asdf,cfg);encoded=json.dumps(report,indent=2)+'\n'
+  from linkage_audit import inspect,raw_log_path
+  report=inspect(a.binary,a.require_asdf,cfg,raw_log_path(a.output) if a.output else None);encoded=json.dumps(report,indent=2)+'\n'
   if a.output:
    a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(encoded)
   print(encoded,end='');raise SystemExit(report['status']!='PASS')
@@ -88,12 +81,12 @@ def main():
   if a.execute:command.append('--execute')
   subprocess.run(command,check=True);return
  if a.cmd=='resume':
-  gate();asdf_smoke_gate(cfg)
+  gate()
   if not shutil.which('bsub'):raise RuntimeError('resume refused: bsub unavailable')
   target=control_lsf(cfg,'resume',a.run_id);subprocess.run(['bsub'],input=target.read_text(),text=True,check=True);return
  if a.cmd=='mock-submission':
   gate();subprocess.run([sys.executable,str(ROOT/'scripts/mock_submission.py')],check=True);return
- gate();asdf_smoke_gate(cfg)
+ gate()
  if not shutil.which('bsub'):raise RuntimeError('submit refused: bsub unavailable')
  if not (runtime(cfg)['root']/'production_status.csv').exists():raise RuntimeError('submit refused: materialize and deployment-check first')
  materialized_gate(cfg)

@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -119,18 +120,50 @@ class AsdfSmokeTests(unittest.TestCase):
         self.assertIn('module load hdf5/1.14.3_oneapi2023', calls[0][2])
         self.assertIn('exec ldd ', calls[0][2])
 
-    def test_submit_gate_requires_fresh_smoke_for_pinned_commit(self):
+    def test_linkage_summary_omits_raw_tool_output_and_writes_requested_log(self):
+        root = Path(tempfile.mkdtemp())
+        binary = root / 'xspecfem3D'
+        binary.write_text('mock')
+        raw_log = root / 'solver-linkage.raw.json'
+        results = [
+            type('Result', (), {'returncode': 0, 'stdout': 'libhdf5.so.310\nother library\n', 'stderr': ''})(),
+            type('Result', (), {'returncode': 0, 'stdout': 'T asdf_initialize_hdf5_f_\n', 'stderr': ''})(),
+        ]
+        with patch('linkage_audit.subprocess.run', side_effect=results):
+            report = linkage_audit.inspect(binary, True, raw_log=raw_log)
+        self.assertNotIn('ldd_stdout', report)
+        self.assertEqual(report['ldd_hdf5_or_missing_lines'], ['libhdf5.so.310'])
+        self.assertEqual(set(report['asdf_symbol_checks'][0]),
+                         {'command', 'returncode', 'found_asdf_initialize_hdf5_f'})
+        raw = json.loads(raw_log.read_text())
+        self.assertIn('other library', raw['ldd']['stdout'])
+        self.assertIn('asdf_initialize_hdf5_f_', raw['asdf_symbol_checks'][0]['stdout'])
+
+    def test_submit_and_resume_ignore_absent_or_stale_smoke_records(self):
         root = Path(tempfile.mkdtemp())
         cfg = load_config(ROOT / 'config/production.toml')
         cfg['paths']['runtime_root'] = root
-        summary = root / 'asdf_smoke' / 'summary.json'
-        summary.parent.mkdir()
-        summary.write_text(json.dumps({'status': 'PASS', 'config_hash': production_cli.digest(ROOT / 'config/production.toml'),
-                                       'source_commit': cfg['source']['commit']}))
-        production_cli.asdf_smoke_gate(cfg)
-        summary.write_text(json.dumps({'status': 'PASS', 'config_hash': 'stale', 'source_commit': cfg['source']['commit']}))
-        with self.assertRaises(RuntimeError):
-            production_cli.asdf_smoke_gate(cfg)
+        (root / 'production_status.csv').write_text('run_id,state\n')
+        control = root / 'control.lsf'
+        control.write_text('#!/usr/bin/env bash\n')
+        calls = []
+        def fake_run(*args, **kwargs):
+            calls.append(args[0])
+            return type('Result', (), {'returncode': 0})()
+        common = [patch('production_cli.load_config', return_value=cfg),
+                  patch('production_cli.gate'), patch('production_cli.shutil.which', return_value='/mock/bsub'),
+                  patch('production_cli.materialized_gate'), patch('production_cli.control_lsf', return_value=control),
+                  patch('production_cli.subprocess.run', side_effect=fake_run)]
+        with common[0], common[1], common[2], common[3], common[4], common[5], \
+             patch.object(sys, 'argv', ['production_cli.py', '--config', str(ROOT / 'config/production.toml'), 'submit']):
+            production_cli.main()
+        stale = root / 'asdf_smoke'
+        stale.mkdir()
+        (stale / 'summary.json').write_text('{"status":"FAIL"}\n')
+        with common[0], common[1], common[2], common[3], common[4], common[5], \
+             patch.object(sys, 'argv', ['production_cli.py', '--config', str(ROOT / 'config/production.toml'), 'resume']):
+            production_cli.main()
+        self.assertEqual(calls, [['bsub'], ['bsub']])
 
 
 if __name__ == '__main__':

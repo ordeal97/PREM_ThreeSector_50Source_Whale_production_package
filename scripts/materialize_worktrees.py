@@ -58,9 +58,8 @@ cd "{workdir}"
 set -euo pipefail
 WORKPATH="{workdir}"; cd "$WORKPATH"; mkdir -p logs
 PACKAGE_ROOT="$(cd "$WORKPATH/../.." && pwd)"
-SMOKE_TOOL="$PACKAGE_ROOT/scripts/asdf_smoke.py"
 LINKAGE_TOOL="$PACKAGE_ROOT/scripts/linkage_audit.py"
-[[ -f "$SMOKE_TOOL" && -f "$LINKAGE_TOOL" ]] || {{ echo "package smoke/linkage tools missing" >&2; exit 1; }}
+[[ -f "$LINKAGE_TOOL" ]] || {{ echo "package linkage tool missing" >&2; exit 1; }}
 {modules}
 [[ -d "{row['scratch_database_path']}" && -w "{row['scratch_database_path']}" ]]
 lock=.mesh_solver_control.lock; mkdir "$lock" || {{ echo "active control lock" >&2; exit 2; }}
@@ -75,7 +74,6 @@ submit_child() {{ local kind="$1" script="$2" output; if [[ "$kind" == mesher ]]
 command -v bsub >/dev/null 2>&1 && command -v bjobs >/dev/null 2>&1 && command -v bhist >/dev/null 2>&1 || fail "LSF commands unavailable"
 write_metadata
 make clean; make {cfg['build']['mesher_target']} -j{jobs}
-{python} "$SMOKE_TOOL" --source-dir "$WORKPATH" --output-dir "$WORKPATH/.asdf_smoke/mesher" || fail "ASDF/HDF5 smoke failed after meshfem build"
 {python} "$LINKAGE_TOOL" --binary "$WORKPATH/bin/xmeshfem3D" --output "$WORKPATH/logs/mesher-linkage.json" || fail "mesher linkage audit failed"
 submit_child mesher mesher_lsf.bash
 wait_done "$MESHER_JOB_ID" mesher

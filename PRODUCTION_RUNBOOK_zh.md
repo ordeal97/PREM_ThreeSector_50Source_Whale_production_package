@@ -12,6 +12,7 @@ python3 scripts/production_cli.py preflight
 python3 scripts/production_cli.py deployment-check
 python3 scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --inspect-only
 python3 scripts/production_cli.py build-template --reference-build /path/to/old/specfem3d_globe --jobs 1
+# 可选独立诊断；不是 submit/resume 门槛：
 python3 scripts/production_cli.py asdf-smoke --source-dir .production_runtime/builds/<inherit>/source/specfem3d_globe
 python3 scripts/production_cli.py render
 python3 scripts/production_cli.py status
@@ -21,7 +22,7 @@ python3 scripts/production_cli.py dry-run
 python3 scripts/production_cli.py submit
 ```
 
-`build-template` 仅读取旧 build 的 configure/module 证据，固定 checkout `ordeal97/ulvz_specfem` commit `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9` 并重编 mesher；不复制旧二进制。归档成功 Aplus `Makefile` 将 `FLAGS_CHECK` 的 `-fpe0` 改为 `-fpe3`，而 `config.status` 的该变量是跨行值；新 build-template 会审计并只重放这一已验证的 Makefile override。Whale 离线时增加 `--source-tree /path/to/ulvz_specfem`，Git 树验证 HEAD；ZIP 解压树必须提供 `SOURCE_PROVENANCE.json` 和关键源码 SHA-256。源码先复制到独立 runtime 树，仍重新 configure，不复用旧 Makefile 或 header。随后必须运行 `asdf-smoke`：它使用实际 Makefile 编译并运行最小 ASDF/HDF5 create/close 探针，报告作为 submit/resume hard gate。已有 worktree 的旧 Makefile 不会被 LSF refresh 改写；`materialize --rebuild-inactive` 只接受 `NOT_SUBMITTED` 或 scratch 已清理的 `EXIT/QC_FAIL`，先移到 `.production_runtime/superseded_worktrees/` 再从新 template 创建。它拒绝活动、DONE 或 scratch 未清理 run。每 run control job 依序编 mesh、通过同一 ASDF smoke 和 mesher linkage 检查、提交 mesher、等待成功、按本 run 新 header 编 solver、检查 solver 的 ASDF/HDF5 linkage 后提交 solver。
+`build-template` 仅读取旧 build 的 configure/module 证据，固定 checkout `ordeal97/ulvz_specfem` commit `72f0c39117df9395c12fa901a9ae99fa3e7bdfd9` 并重编 mesher；不复制旧二进制。归档成功 Aplus `Makefile` 将 `FLAGS_CHECK` 的 `-fpe0` 改为 `-fpe3`，而 `config.status` 的该变量是跨行值；新 build-template 会审计并只重放这一已验证的 Makefile override。Whale 离线时增加 `--source-tree /path/to/ulvz_specfem`，Git 树验证 HEAD；ZIP 解压树必须提供 `SOURCE_PROVENANCE.json` 和关键源码 SHA-256。源码先复制到独立 runtime 树，仍重新 configure，不复用旧 Makefile 或 header。`asdf-smoke` 可按需运行，报告仅作诊断，既不阻止 submit/resume，也不会由 control job 自动调用。已有 worktree 的旧 Makefile 不会被 LSF refresh 改写；`materialize --rebuild-inactive` 只接受 `NOT_SUBMITTED` 或 scratch 已清理的 `EXIT/QC_FAIL`，先移到 `.production_runtime/superseded_worktrees/` 再从新 template 创建。它拒绝活动、DONE 或 scratch 未清理 run。每 run control job 依序编 mesh、通过 mesher linkage 检查、提交 mesher、等待成功、按本 run 新 header 编 solver、检查 solver 的 ASDF/HDF5 linkage 后提交 solver。
 
 查询进度：`python3 scripts/production_cli.py status`。`resume` 仅接管未完成/未提交项，不会自动重试失败 run。失败 run 会在所有已知 control/mesher/solver 作业终态、诊断保存完成后自动清理其精确 scratch 目录；提交身份未确认或 cleanup 失败会阻止继续提交。仅在审阅失败证据后执行 `python3 scripts/production_cli.py resume --run-id SRC001_B0` 显式重试。cleanup 默认预览：`python3 scripts/production_cli.py cleanup --run-id SRC001_B0`；执行使用 `python3 scripts/production_cli.py cleanup --run-id SRC001_B0 --execute`，它会取得 controller 锁并再次检查所有已知作业终态。
 

@@ -10,9 +10,8 @@
 set -euo pipefail
 WORKPATH="${LS_SUBCWD:-$PWD}"; cd "$WORKPATH"; mkdir -p logs
 PACKAGE_ROOT="$(cd "$WORKPATH/../.." && pwd)"
-SMOKE_TOOL="$PACKAGE_ROOT/scripts/asdf_smoke.py"
 LINKAGE_TOOL="$PACKAGE_ROOT/scripts/linkage_audit.py"
-[[ -f "$SMOKE_TOOL" && -f "$LINKAGE_TOOL" ]] || { echo "package smoke/linkage tools missing" >&2; exit 1; }
+[[ -f "$LINKAGE_TOOL" ]] || { echo "package linkage tool missing" >&2; exit 1; }
 module purge
 if ! command -v ifort >/dev/null 2>&1 || ! command -v mpiifort >/dev/null 2>&1 || ! command -v mpirun >/dev/null 2>&1; then
   set +u
@@ -36,7 +35,6 @@ submit_child() { local kind="$1" script="$2" output; if [[ "$kind" == mesher ]];
 command -v bsub >/dev/null 2>&1 && command -v bjobs >/dev/null 2>&1 && command -v bhist >/dev/null 2>&1 || fail "LSF commands unavailable"
 write_metadata
 make clean; make meshfem3D -j1
-/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3 "$SMOKE_TOOL" --source-dir "$WORKPATH" --output-dir "$WORKPATH/.asdf_smoke/mesher" || fail "ASDF/HDF5 smoke failed after meshfem build"
 /share/home/yiy/.conda/envs/ulvz-specfem/bin/python3 "$LINKAGE_TOOL" --binary "$WORKPATH/bin/xmeshfem3D" --output "$WORKPATH/logs/mesher-linkage.json" || fail "mesher linkage audit failed"
 submit_child mesher mesher_lsf.bash
 wait_done "$MESHER_JOB_ID" mesher

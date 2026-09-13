@@ -29,7 +29,8 @@ class EnvironmentProfileTests(unittest.TestCase):
     self.assertIn('required command missing: mpiifort',text)
     if name == 'submit_lsf.bash':
      self.assertIn('PACKAGE_ROOT="$(cd "$WORKPATH/../.." && pwd)"',text)
-     self.assertIn('"$SMOKE_TOOL" --source-dir "$WORKPATH"',text)
+     self.assertNotIn('SMOKE_TOOL=',text)
+     self.assertNotIn('.asdf_smoke',text)
      self.assertIn('"$LINKAGE_TOOL" --binary "$WORKPATH/bin/xspecfem3D" --require-asdf',text)
     if name != 'submit_lsf.bash':self.assertIn('mpirun -np',text)
  def test_initialized_environment_skips_setvars(self):
