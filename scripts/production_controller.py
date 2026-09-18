@@ -140,7 +140,7 @@ def monitor(cfg,row):
  elif control=='RUN':update(cfg,rid,'state=CONTROL_RUN')
  elif control=='DONE' and not solver:fail(cfg,row,'CONTROL','control_done_without_solver')
 def stage1_failed(manifest,status,cfg):return any(status.get(x['run_id'],{}).get('state') in FAILURES for x in manifest if x['stage']==cfg['staging']['stage1'])
-def retry_ready(status,states,scratch):return status.get('state') in FAILURES and all_terminal(states) and status.get('scratch_cleaned')=='true' and not scratch.exists()
+def retry_ready(status,states,scratch):return status.get('state') in FAILURES and all_terminal(states) and status.get('scratch_cleaned')=='true' and not scratch.exists() and not scratch.is_symlink()
 def loop(cfg,manifest,once):
  for command in ('bsub','bjobs','bhist'):
   if not shutil.which(command):raise RuntimeError(command+' unavailable')
@@ -164,23 +164,53 @@ def loop(cfg,manifest,once):
   if stage1_failed(manifest,current,cfg) and not any(x['state'] in ACTIVE for x in current.values()):return
   if not any(x['state'] in ACTIVE or x['state']=='NOT_SUBMITTED' for x in current.values()):return
   time.sleep(cfg['lsf']['controller_poll_seconds'])
-def retry(cfg,rid):
- status=state(cfg).get(rid)
- if not status:raise SystemExit('--retry requires EXIT or QC_FAIL')
- row=next(x for x in rows(cfg['paths']['manifest']) if x['run_id']==rid);states=job_states(cfg['paths']['run_root']/rid,status);_,scratch=scratch_target(cfg,row)
- if not retry_ready(status,states,scratch):raise SystemExit('retry requires terminal jobs and cleaned old scratch')
+def retry_checks(cfg,run_ids):
+ manifest={row['run_id']:row for row in rows(cfg['paths']['manifest'])};status=state(cfg);selected=[];errors=[]
+ for rid in dict.fromkeys(run_ids):
+  row=manifest.get(rid);current=status.get(rid);reasons=[]
+  if not row:reasons.append('run_id missing from manifest')
+  if not current:reasons.append('run_id missing from production_status.csv')
+  if row and current:
+   run=cfg['paths']['run_root']/rid
+   if current.get('state') not in FAILURES:reasons.append('state is '+repr(current.get('state'))+', expected EXIT or QC_FAIL')
+   try:
+    _,scratch=scratch_target(cfg,row)
+    if scratch.is_symlink() or scratch.exists():reasons.append('old scratch directory still exists')
+   except RuntimeError as exc:reasons.append(str(exc))
+   if current.get('scratch_cleaned')!='true':reasons.append('scratch_cleaned is not true')
+   if submission_pending(run):reasons.append('child job submission is still pending')
+   states=job_states(run,current)
+   if not all_terminal(states):reasons.append('related LSF jobs are not terminal: '+json.dumps(states,sort_keys=True))
+   frozen=worktree_errors(cfg,row)
+   if frozen:reasons.append('worktree/frozen input check failed: '+', '.join(frozen))
+   try:int(current.get('attempt') or 0)
+   except ValueError:reasons.append('attempt is not an integer')
+  if reasons:errors.append(rid+': '+'; '.join(reasons))
+  elif row and current:selected.append((row,current))
+ return selected,errors
+def retry(cfg,rid,status):
  stamp=now().replace(':','').replace('-','');run=cfg['paths']['run_root']/rid;archive=cfg['paths']['runtime_root']/'failed_attempts'/f'{rid}.{stamp}'
  if run.exists():archive.parent.mkdir(parents=True,exist_ok=True);shutil.move(str(run),str(archive))
- materialize=subprocess.run([sys.executable,str(cfg['_root']/'scripts/materialize_worktrees.py'),'--config',str(cfg['_path'])],text=True,capture_output=True)
+ materialize=subprocess.run([sys.executable,str(cfg['_root']/'scripts/materialize_worktrees.py'),'--config',str(cfg['_path']),'--run-id',rid],text=True,capture_output=True)
  if materialize.returncode:raise SystemExit('retry worktree materialization failed: '+materialize.stderr)
+ row=next(row for row in rows(cfg['paths']['manifest']) if row['run_id']==rid)
+ frozen=worktree_errors(cfg,row)
+ if frozen:raise SystemExit('retry worktree verification failed for '+rid+': '+', '.join(frozen))
  update(cfg,rid,'state=NOT_SUBMITTED','output_qc=','reason=explicit_retry','attempt='+str(int(status.get('attempt') or 0)+1),'control_job_id=','mesher_job_id=','solver_job_id=','submit_time=','finish_time=','failure_stage=','failure_time=','scratch_cleaned=','cleanup_time=','cleanup_error=')
 def main():
- p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--action',choices=('run','resume','status'),required=True);p.add_argument('--retry');p.add_argument('--once',action='store_true');a=p.parse_args();cfg=load_config(a.config);rt=runtime(cfg);rt['root'].mkdir(parents=True,exist_ok=True)
- if not rt['status'].exists():tool(cfg,'init','--template',str(cfg['paths']['status_template']))
- if a.action=='status':print(rt['status'].read_text(),end='');return
+ p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);p.add_argument('--action',choices=('run','resume','status'),required=True);p.add_argument('--retry',nargs='+');p.add_argument('--once',action='store_true');a=p.parse_args();cfg=load_config(a.config);rt=runtime(cfg);rt['root'].mkdir(parents=True,exist_ok=True)
+ if a.action=='status':
+  if not rt['status'].exists():tool(cfg,'init','--template',str(cfg['paths']['status_template']))
+  print(rt['status'].read_text(),end='');return
+ if not rt['status'].exists():
+  if a.retry:raise SystemExit('retry requires existing production_status.csv')
+  tool(cfg,'init','--template',str(cfg['paths']['status_template']))
  with rt['lock'].open('a+') as f:
   try:fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)
   except BlockingIOError:raise SystemExit('another controller holds lock')
-  if a.retry:retry(cfg,a.retry)
+  if a.retry:
+   selected,errors=retry_checks(cfg,a.retry)
+   if errors:raise SystemExit('retry refused; no runs changed:\n'+'\n'.join(errors))
+   for row,status in selected:retry(cfg,row['run_id'],status)
   loop(cfg,rows(cfg['paths']['manifest']),a.once)
 if __name__=='__main__':main()

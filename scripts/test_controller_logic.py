@@ -5,7 +5,7 @@ from unittest.mock import patch
 from materialize_worktrees import ensure_runtime_dirs,main as materialize_main,may_replace_inactive
 from production_common import worktree_errors
 from production_cli import control_lsf,materialized_gate
-from production_controller import all_terminal, counts_as_active, fail, process_failure, process_success_cleanup, remove_scratch, retry_ready, scheduler, stage2_ready, submission_blocked, submit
+from production_controller import all_terminal, counts_as_active, fail, loop, process_failure, process_success_cleanup, remove_scratch, retry, retry_checks, retry_ready, scheduler, stage2_ready, submission_blocked, submit
 class ControllerLogic(unittest.TestCase):
  def setUp(self):
   self.cfg={'staging':{'stage1':'B0','stage2':'M3'}};self.manifest=[{'run_id':'A','stage':'B0'},{'run_id':'B','stage':'B0'},{'run_id':'C','stage':'M3'}]
@@ -30,6 +30,12 @@ class ControllerLogic(unittest.TestCase):
   control_lsf(cfg,'run')
   self.assertTrue((root/'runtime/logs').is_dir())
   self.assertIn('#BSUB -L /bin/bash',(root/'runtime/rendered_lsf/production_run.lsf').read_text())
+ def test_control_lsf_passes_multiple_retry_ids_to_one_controller(self):
+  root=Path(tempfile.mkdtemp())
+  cfg={'lsf':{'control_job_prefix':'p','control_queue':'serial','control_ranks':1,'control_hosts':1},'runtime':{'python_bin':'python3'},'_root':root,'_path':root/'config.toml','paths':{'runtime_root':root/'runtime'}}
+  rendered=control_lsf(cfg,'resume',('A','B','C'))
+  self.assertEqual(rendered.read_text().count('--retry'),1)
+  self.assertIn('--retry A B C',rendered.read_text())
  def test_job_terminal_guard_and_retry_guard(self):
   self.assertTrue(all_terminal({'control_job_id':'EXIT','mesher_job_id':'DONE','solver_job_id':'EXIT'}))
   for state in ('RUN','PEND','UNKNOWN'):
@@ -38,6 +44,41 @@ class ControllerLogic(unittest.TestCase):
   self.assertTrue(retry_ready({'state':'EXIT','scratch_cleaned':'true'},{'control_job_id':'EXIT'},scratch))
   self.assertFalse(retry_ready({'state':'EXIT','scratch_cleaned':'true'},{'control_job_id':'RUN'},scratch))
   self.assertFalse(retry_ready({'state':'QC_FAIL','scratch_cleaned':'false'},{'solver_job_id':'EXIT'},scratch))
+  scratch.symlink_to(Path(tempfile.mkdtemp())/'absent')
+  self.assertFalse(retry_ready({'state':'EXIT','scratch_cleaned':'true'},{'control_job_id':'EXIT'},scratch))
+ def test_retry_checks_rejects_done_or_invalid_batch_without_changes(self):
+  root=Path(tempfile.mkdtemp());manifest=[{'run_id':'A','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')},{'run_id':'B','scratch_database_path':str(root/'scratch'/'B'/'DATABASES_MPI')}]
+  cfg={'paths':{'manifest':root/'manifest.csv','run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'},'_root':root,'source':{'commit':'x'}}
+  statuses={'A':{'state':'EXIT','attempt':'0','scratch_cleaned':'true'},'B':{'state':'DONE','attempt':'0','scratch_cleaned':'true'}}
+  with patch('production_controller.rows',return_value=manifest),patch('production_controller.state',return_value=statuses),patch('production_controller.job_states',return_value={'control_job_id':'EXIT'}),patch('production_controller.worktree_errors',return_value=[]):
+   selected,errors=retry_checks(cfg,['A','B','MISSING'])
+  self.assertEqual([row['run_id'] for row,_ in selected],['A'])
+  self.assertTrue(any(error.startswith('B:') and 'DONE' in error for error in errors))
+  self.assertTrue(any(error.startswith('MISSING:') for error in errors))
+ def test_single_and_multiple_retry_prepare_each_run(self):
+  root=Path(tempfile.mkdtemp());manifest=[{'run_id':'A','scratch_database_path':str(root/'scratch'/'A'/'DATABASES_MPI')},{'run_id':'B','scratch_database_path':str(root/'scratch'/'B'/'DATABASES_MPI')}]
+  cfg={'paths':{'manifest':root/'manifest.csv','run_root':root/'work','scratch_root':root/'scratch','runtime_root':root/'runtime'},'_root':root,'_path':root/'config.toml','source':{'commit':'x'}}
+  statuses={'A':{'state':'EXIT','attempt':'0','scratch_cleaned':'true'},'B':{'state':'QC_FAIL','attempt':'3','scratch_cleaned':'true'}};updates=[]
+  ok=type('Result',(),{'returncode':0,'stderr':''})()
+  with patch('production_controller.rows',return_value=manifest),patch('production_controller.state',return_value=statuses),patch('production_controller.job_states',return_value={'control_job_id':'EXIT'}),patch('production_controller.worktree_errors',return_value=[]),patch('production_controller.subprocess.run',return_value=ok) as materialize,patch('production_controller.update',side_effect=lambda *args:updates.append(args)):
+   selected,errors=retry_checks(cfg,['A','B'])
+   self.assertEqual(errors,[])
+   for row,status in selected:retry(cfg,row['run_id'],status)
+  self.assertEqual([call.args[0][-1] for call in materialize.call_args_list],['A','B'])
+  self.assertTrue(any(call[1]=='A' and 'attempt=1' in call for call in updates))
+  self.assertTrue(any(call[1]=='B' and 'attempt=4' in call for call in updates))
+ def test_loop_queues_excess_retry_and_opens_stage2_after_pass(self):
+  cfg={'lsf':{'max_active_runs':2},'staging':{'stage1':'B0','stage2':'M3'},'paths':{'run_root':Path(tempfile.mkdtemp())/'work'}}
+  manifest=[{'run_id':'A','stage':'B0'},{'run_id':'B','stage':'B0'},{'run_id':'C','stage':'B0'},{'run_id':'D','stage':'M3'}]
+  retry_status={row['run_id']:{'state':'NOT_SUBMITTED','output_qc':''} for row in manifest};submitted=[]
+  with patch('production_controller.shutil.which',return_value='/mock'),patch('production_controller.state',return_value=retry_status),patch('production_controller.submit',side_effect=lambda _,row:submitted.append(row['run_id'])):
+   loop(cfg,manifest,True)
+  self.assertEqual(submitted,['A','B'])
+  passed={'A':{'state':'DONE','output_qc':'PASS'},'B':{'state':'DONE','output_qc':'PASS'},'C':{'state':'DONE','output_qc':'PASS'},'D':{'state':'NOT_SUBMITTED','output_qc':''}}
+  submitted=[]
+  with patch('production_controller.shutil.which',return_value='/mock'),patch('production_controller.state',return_value=passed),patch('production_controller.submit',side_effect=lambda _,row:submitted.append(row['run_id'])):
+   loop(cfg,manifest,True)
+  self.assertEqual(submitted,['D'])
  def test_cleanup_failure_blocks_submissions(self):
   self.assertTrue(submission_blocked({'A':{'scratch_cleaned':'false'}}))
   self.assertFalse(submission_blocked({'A':{'scratch_cleaned':'true'},'B':{'scratch_cleaned':''}}))

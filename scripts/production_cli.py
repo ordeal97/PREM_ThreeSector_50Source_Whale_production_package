@@ -17,9 +17,9 @@ def materialized_gate(cfg):
  for row in rows(cfg['paths']['manifest']):
   for message in worktree_errors(cfg,row):errors.append(row['run_id']+': '+message)
  if errors:raise RuntimeError('submit refused: worktree verification failed; '+'; '.join(errors))
-def control_lsf(cfg,action,retry=None):
+def control_lsf(cfg,action,retry=()):
  target=runtime(cfg)['root']/'rendered_lsf'/f'production_{action}.lsf';target.parent.mkdir(parents=True,exist_ok=True);(runtime(cfg)['root']/'logs').mkdir(parents=True,exist_ok=True)
- retry_arg='' if not retry else ' --retry '+retry
+ retry_arg='' if not retry else ' --retry '+' '.join(shlex.quote(run_id) for run_id in retry)
  target.write_text(f'''#!/usr/bin/env bash
 #BSUB -J {cfg['lsf']['control_job_prefix']}_PREM3S_{action}
 #BSUB -q {cfg['lsf']['control_queue']}
@@ -40,7 +40,8 @@ def main():
  s.choices['linkage-audit'].add_argument('--require-asdf',action='store_true')
  s.choices['linkage-audit'].add_argument('--output',type=Path)
  s.choices['materialize'].add_argument('--rebuild-inactive',action='store_true')
- for name in ('resume','cleanup'):s.choices[name].add_argument('--run-id')
+ s.choices['resume'].add_argument('--run-id',nargs='+')
+ s.choices['cleanup'].add_argument('--run-id')
  s.choices['cleanup'].add_argument('--execute',action='store_true')
  a=p.parse_args();cfg=load_config(a.config)
  if a.cmd in {'validate','preflight'}:
@@ -83,7 +84,7 @@ def main():
  if a.cmd=='resume':
   gate()
   if not shutil.which('bsub'):raise RuntimeError('resume refused: bsub unavailable')
-  target=control_lsf(cfg,'resume',a.run_id);subprocess.run(['bsub'],input=target.read_text(),text=True,check=True);return
+  target=control_lsf(cfg,'resume',a.run_id or ());subprocess.run(['bsub'],input=target.read_text(),text=True,check=True);return
  if a.cmd=='mock-submission':
   gate();subprocess.run([sys.executable,str(ROOT/'scripts/mock_submission.py')],check=True);return
  gate()
