@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "errors": [],
+  "row_count": 51000,
+  "unique_key_count": 51000,
+  "source_count": 50,
+  "station_count": 510,
+  "record_length_s": 2520.0,
+  "s_audit_join_count": 25500,
+  "s_audit_max_abs_difference_s": 4.997109499527141e-07,
+  "anchor_phase_counts": {
+    "P/Pdiff": {
+      "P": 5100,
+      "Pdiff": 20400
+    },
+    "S/Sdiff": {
+      "S": 7650,
+      "Sdiff": 17850
+    }
+  }
+}

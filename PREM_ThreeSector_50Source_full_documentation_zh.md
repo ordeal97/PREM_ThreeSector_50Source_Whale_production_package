@@ -20,6 +20,8 @@ Whale 的运行 profile 继承 A+ package：control Python 为 `/share/home/yiy/
 
 `production_run_manifest.csv`、catalogs、100 份 `production_inputs/*/DATA`、`rendered_lsf/` 与母包共同定义冻结输入。`scripts/preflight.py` 从 rendered DATA 对照 source、station、parameter、instance 与 manifest；检查 50/510/100/150 计数、39/4/3/1/3 深度配额、0/3 bodies、zero taper、clearance、唯一 scratch、公共 Par_file、source pairing 与阶段身份。若 worktree 已存在，也逐项比对实际 DATA、三份 LSF 与 identity；不一致会使 preflight 失败。`preflight/all_runs_parameter_audit.csv` 是一行一个 run 的人工审查总表。
 
+构包时还会从冻结的 50 个震源、510 个台站和 PREM/TauP 到时自动生成 `catalogs/station_phase_windows.csv`，并写出中文说明、方法参数、输入哈希清单与验证摘要。窗口采用项目已有建议：P/Pdiff 扩展窗为锚点 −30 至 +80 s，S/Sdiff 为 −30 至 +120 s；主窗按 TauP 相位族成员首末到时各外扩 20 s。它们用于训练/后处理规划，不能替代合成波形拾取或模型验证。详情见 `catalogs/phase_window_estimate_zh.md`。
+
 submit 前 `preflight_summary.json` 必须 PASS，且 config、contract、manifest、template、DATA、rendered LSF hashes 与当时结果一致。任意修改均使 gate 过期；不会 warning 后继续提交。
 
 ## Whale 执行与控制

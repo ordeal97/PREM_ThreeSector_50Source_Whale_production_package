@@ -14,6 +14,8 @@
     "instance_manifest": "catalogs/ulvz_instance_manifest.csv",
     "manifest": "production_run_manifest.csv",
     "parameter_catalog": "catalogs/ulvz_parameter_catalog.csv",
+    "phase_window_report": "catalogs/phase_window_estimate_zh.md",
+    "phase_window_table": "catalogs/station_phase_windows.csv",
     "preflight_report": "preflight/PREFLIGHT_REPORT.md",
     "source_catalog": "catalogs/source_ensemble.csv",
     "station_catalog": "catalogs/station_geometry.csv",
@@ -43,6 +45,12 @@
     "family_interpolant": 66,
     "legacy_parameter_anchor": 33,
     "survey_family_sample": 51
+  },
+  "phase_window_estimate": {
+    "report": "catalogs/phase_window_estimate_zh.md",
+    "rows": 51000,
+    "status": "PASS",
+    "table": "catalogs/station_phase_windows.csv"
   },
   "physics_settings": {
     "absorbing_conditions": false,

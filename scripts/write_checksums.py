@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-SKIP={".production_runtime","__pycache__","DATABASES_MPI","OUTPUT_FILES","checksums.sha256","checksums.immutable.sha256"}
+SKIP={".git",".production_runtime","__pycache__","DATABASES_MPI","OUTPUT_FILES","checksums.sha256","checksums.immutable.sha256"}
 def sha(path):
  h=hashlib.sha256();
  with path.open("rb") as f:

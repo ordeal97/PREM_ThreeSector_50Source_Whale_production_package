@@ -4,6 +4,8 @@
 
 完整科学与操作说明见 [中文完整文档](PREM_ThreeSector_50Source_full_documentation_zh.md) 和 [运行手册](PRODUCTION_RUNBOOK_zh.md)。首先审阅 [母包](specfem_template/)、[全部 run 参数总表](preflight/all_runs_parameter_audit.csv) 和 [preflight 报告](preflight/PREFLIGHT_REPORT.md)。
 
+本包另含基于冻结的 50 个震源、510 个台站和 TauP/PREM 计算的 P/Pdiff 与 S/Sdiff 时窗建议：[中文说明](catalogs/phase_window_estimate_zh.md)、[逐源逐站 CSV](catalogs/station_phase_windows.csv)。重新运行 `scripts/build_package.py` 构包时会自动再生这些表及方法、输入清单和验证摘要。它们用于训练/后处理规划，不能替代合成波形拾取或模型验证。
+
 ## 在 Whale 继承旧版本编译方法
 
 先只读检查旧的已编译 SPECFEM 目录（也支持其父目录）：

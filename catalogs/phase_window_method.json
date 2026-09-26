@@ -1,0 +1,76 @@
+{
+  "taup_model": "prem",
+  "phase_context": [
+    "P",
+    "Pdiff",
+    "pP",
+    "sP",
+    "pPdiff",
+    "sPdiff",
+    "PcP",
+    "PP",
+    "PKP",
+    "S",
+    "Sdiff",
+    "pS",
+    "sS",
+    "pSdiff",
+    "sSdiff",
+    "ScS",
+    "SS",
+    "SKS",
+    "SKKS"
+  ],
+  "main_window": {
+    "before_family_first_s": 20.0,
+    "after_family_last_s": 20.0,
+    "family_member_span_s": 30.0
+  },
+  "families": {
+    "P/Pdiff": {
+      "candidates": [
+        "P",
+        "Pdiff",
+        "pP",
+        "pPdiff",
+        "sP",
+        "sPdiff"
+      ],
+      "primary_component": "Z",
+      "auxiliary_component": "R",
+      "extended_relative_s": [
+        -30.0,
+        80.0
+      ],
+      "evidence_ids": "pilot::E001;pilot::E002",
+      "window_basis": "Kim Pdiff −30…+70 s processing window; +10 s conservative extension"
+    },
+    "S/Sdiff": {
+      "candidates": [
+        "S",
+        "Sdiff",
+        "pS",
+        "pSdiff",
+        "sS",
+        "sSdiff"
+      ],
+      "primary_component": "T",
+      "auxiliary_component": "",
+      "extended_relative_s": [
+        -30.0,
+        120.0
+      ],
+      "evidence_ids": "pilot::E002;batch_02::B02-E052;EVENT1_CONFIG",
+      "window_basis": "Reported Sdiff delays/postcursors plus historical Event-1 +20…+120 s tail"
+    }
+  },
+  "frequency_hz": [
+    0.05,
+    0.1
+  ],
+  "sample_rate_hz": 10.0,
+  "record_length_s": 2520.0,
+  "interpretation": "project_recommendation_not_observed_pick",
+  "window_table": "catalogs/station_phase_windows.csv",
+  "input_inventory": "catalogs/phase_window_source_inventory.csv"
+}

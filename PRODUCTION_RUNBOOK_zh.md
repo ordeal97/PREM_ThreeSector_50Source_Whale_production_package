@@ -2,6 +2,8 @@
 
 本包已冻结科学设计与 100 份 DATA/LSF；未调用 bsub、mesher 或 solver。生产控制器只允许两个 active run，且必须先使 50 个 B0 全部 `DONE + output_qc=PASS`，才解锁 50 个 TRIULVZ。
 
+构包脚本会从冻结的 50 个震源、510 个台站和 PREM/TauP 结果自动生成逐源逐站的 P/Pdiff、S/Sdiff 时窗建议。审阅 `catalogs/phase_window_estimate_zh.md`、`catalogs/station_phase_windows.csv` 和 `catalogs/phase_window_validation.json`；这些是训练/后处理建议，不代表波形实测拾取。
+
 Whale 运行环境已继承 A+ package：控制 Python 为 `/share/home/yiy/.conda/envs/ulvz-specfem/bin/python3`；LSF 和构建先 `module purge`，检查 `ifort`、`mpiifort`、`mpirun`，仅在其中任一缺失时以 `/share/apps/intel/oneapi_2023.1.0/setvars.sh --force` 补全环境，再加载 `hdf5/1.14.3_oneapi2023`。这使 control→mesher/solver 的继承环境无需重复 source。Python 必须为 3.11 或更新版本，并可导入 `numpy`、`h5py`。`deployment-check` 会检查这些依赖，不运行 bsub、mesher 或 solver。
 
 在 Whale 的 package 根目录执行：
